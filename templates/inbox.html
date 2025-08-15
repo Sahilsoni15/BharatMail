@@ -655,6 +655,154 @@
         font-size: 14px;
         font-weight: bold;
     }
+
+    /* Auto-complete styles for compose panel */
+    .compose-panel .autocomplete-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .compose-panel .autocomplete-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        display: none;
+    }
+
+    .compose-panel .autocomplete-suggestion {
+        padding: 10px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background-color 0.2s;
+    }
+
+    .compose-panel .autocomplete-suggestion:hover {
+        background-color: #f5f5f5;
+    }
+
+    .compose-panel .autocomplete-suggestion.selected {
+        background-color: #e3f2fd;
+    }
+
+    .compose-panel .suggestion-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .compose-panel .suggestion-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .compose-panel .suggestion-name {
+        font-weight: 500;
+        font-size: 14px;
+        color: #202124;
+        margin-bottom: 2px;
+    }
+
+    .compose-panel .suggestion-email {
+        font-size: 12px;
+        color: #5f6368;
+    }
+
+    .compose-panel .recipient-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+        padding: 8px 12px;
+        background-color: rgba(26, 115, 232, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(26, 115, 232, 0.2);
+    }
+
+    .compose-panel .recipient-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .compose-panel .recipient-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .compose-panel .recipient-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #202124;
+    }
+
+    .compose-panel .recipient-email {
+        font-size: 12px;
+        color: #5f6368;
+    }
+
+    /* Dark mode for compose panel autocomplete */
+    @media (prefers-color-scheme: dark) {
+        .compose-panel .autocomplete-suggestions {
+            background: #242526;
+            border-color: #3a3b3c;
+            color: #e8eaed;
+        }
+        
+        .compose-panel .autocomplete-suggestion:hover {
+            background-color: #3a3b3c;
+        }
+        
+        .compose-panel .autocomplete-suggestion.selected {
+            background-color: #174ea6;
+        }
+        
+        .compose-panel .suggestion-name {
+            color: #e8eaed;
+        }
+        
+        .compose-panel .suggestion-email {
+            color: #9aa0a6;
+        }
+        
+        .compose-panel .recipient-info {
+            background-color: rgba(26, 115, 232, 0.1);
+            border-color: rgba(26, 115, 232, 0.3);
+        }
+        
+        .compose-panel .recipient-name {
+            color: #e8eaed;
+        }
+        
+        .compose-panel .recipient-email {
+            color: #9aa0a6;
+        }
+    }
 </style>
 </head>
 <body>
@@ -767,7 +915,17 @@
             <input type="email" id="fromEmail" name="from" value="{{ user_email }}" readonly>
 
             <label for="toEmail">To</label>
-            <input type="email" id="toEmail" name="to" placeholder="Recipient email" required>
+            <div class="autocomplete-container">
+                <input type="email" id="toEmail" name="to" placeholder="Recipient email" required>
+                <div class="autocomplete-suggestions" id="inboxAutocompleteSuggestions"></div>
+                <div class="recipient-info" id="inboxRecipientInfo" style="display: none;">
+                    <div class="recipient-avatar" id="inboxRecipientAvatar"></div>
+                    <div class="recipient-details">
+                        <span class="recipient-name" id="inboxRecipientName"></span>
+                        <span class="recipient-email" id="inboxRecipientEmail"></span>
+                    </div>
+                </div>
+            </div>
 
             <div style="display: flex; gap: 10px; align-items: center; margin-bottom:4px;">
                 <button type="button" onclick="toggleCC()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:0;">CC</button>
@@ -1062,10 +1220,260 @@ document.addEventListener('click', function(e) {
 // Compose panel control
 function openCompose() {
     document.getElementById('composePanel').style.display = 'flex';
+    // Initialize auto-complete for inbox compose panel
+    initializeInboxComposeAutoComplete();
 }
 
 function closeCompose() {
     document.getElementById('composePanel').style.display = 'none';
+}
+
+// Auto-complete functionality for inbox compose panel
+let inboxUsers = [];
+let inboxSelectedSuggestionIndex = -1;
+
+// Initialize auto-complete for inbox compose panel
+async function initializeInboxComposeAutoComplete() {
+    try {
+        console.log('Fetching users for inbox compose auto-complete...');
+        const response = await fetch('/api/users');
+        console.log('Inbox compose response status:', response.status);
+        if (response.ok) {
+            inboxUsers = await response.json();
+            console.log('Inbox compose users fetched:', inboxUsers.length);
+            setupInboxComposeAutoComplete();
+        } else {
+            console.error('Failed to fetch users for inbox compose:', response.status);
+        }
+    } catch (error) {
+        console.error('Error fetching users for inbox compose:', error);
+    }
+}
+
+// Setup auto-complete for inbox compose panel
+function setupInboxComposeAutoComplete() {
+    const toEmailInput = document.getElementById('toEmail');
+    const inboxAutocompleteSuggestions = document.getElementById('inboxAutocompleteSuggestions');
+    
+    if (!toEmailInput || !inboxAutocompleteSuggestions) return;
+    
+    // Event listeners for inbox compose auto-complete
+    toEmailInput.addEventListener('input', (e) => {
+        const value = e.target.value;
+        console.log('Inbox compose input value:', value);
+        
+        // Hide recipient info if input is cleared
+        if (!value) {
+            hideInboxRecipientInfo();
+        }
+        
+        // Auto-complete @bharatmail.in when @ is typed
+        if (value.includes('@') && !value.includes('@bharatmail.in')) {
+            const atIndex = value.lastIndexOf('@');
+            const beforeAt = value.substring(0, atIndex);
+            const afterAt = value.substring(atIndex + 1);
+            
+            // If just @ is typed, auto-complete with bharatmail.in
+            if (afterAt === '') {
+                const newValue = beforeAt + '@bharatmail.in';
+                toEmailInput.value = newValue;
+                // Set cursor position after @
+                toEmailInput.setSelectionRange(atIndex + 1, atIndex + 1);
+            }
+        }
+        
+        showInboxSuggestions(value);
+    });
+    
+    toEmailInput.addEventListener('keydown', handleInboxKeydown);
+    
+    toEmailInput.addEventListener('focus', () => {
+        if (toEmailInput.value) {
+            showInboxSuggestions(toEmailInput.value);
+        }
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!toEmailInput.contains(e.target) && !inboxAutocompleteSuggestions.contains(e.target)) {
+            inboxAutocompleteSuggestions.style.display = 'none';
+            inboxSelectedSuggestionIndex = -1;
+        }
+    });
+}
+
+// Show suggestions for inbox compose
+function showInboxSuggestions(query) {
+    console.log('Showing inbox suggestions for:', query);
+    if (!query) {
+        document.getElementById('inboxAutocompleteSuggestions').style.display = 'none';
+        return;
+    }
+    
+    const atIndex = query.lastIndexOf('@');
+    const beforeAt = query.substring(0, atIndex);
+    const afterAt = query.substring(atIndex + 1);
+    
+    // If @ is typed, auto-complete with bharatmail.in
+    if (afterAt === '') {
+        const suggestions = inboxUsers.filter(user => 
+            user.email.startsWith(beforeAt + '@bharatmail.in') ||
+            user.name.toLowerCase().includes(beforeAt.toLowerCase())
+        ).slice(0, 5);
+        
+        displayInboxSuggestions(suggestions, beforeAt + '@bharatmail.in');
+        return;
+    }
+    
+    // If typing after @, filter by domain
+    if (afterAt && afterAt.length > 0) {
+        const suggestions = inboxUsers.filter(user => 
+            user.email.toLowerCase().includes(query.toLowerCase()) ||
+            user.name.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 5);
+        
+        displayInboxSuggestions(suggestions, query);
+        return;
+    }
+    
+    // Filter users based on query (before @)
+    const suggestions = inboxUsers.filter(user => 
+        user.email.toLowerCase().includes(query.toLowerCase()) ||
+        user.name.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 5);
+    
+    displayInboxSuggestions(suggestions, query);
+}
+
+// Display suggestions for inbox compose
+function displayInboxSuggestions(suggestions, query) {
+    const inboxAutocompleteSuggestions = document.getElementById('inboxAutocompleteSuggestions');
+    console.log('Displaying inbox suggestions:', suggestions.length, 'for query:', query);
+    
+    if (suggestions.length === 0) {
+        inboxAutocompleteSuggestions.style.display = 'none';
+        return;
+    }
+    
+    inboxAutocompleteSuggestions.innerHTML = '';
+    
+    suggestions.forEach((user, index) => {
+        const avatar = generateAvatar(user.name, user.email);
+        const suggestionDiv = document.createElement('div');
+        suggestionDiv.className = 'autocomplete-suggestion';
+        suggestionDiv.setAttribute('data-index', index);
+        suggestionDiv.setAttribute('data-email', user.email);
+        
+        suggestionDiv.innerHTML = `
+            <div class="suggestion-avatar" style="background-color: ${avatar.backgroundColor}">
+                ${avatar.initials}
+            </div>
+            <div class="suggestion-info">
+                <div class="suggestion-name">${user.name}</div>
+                <div class="suggestion-email">${user.email}</div>
+            </div>
+        `;
+        
+        suggestionDiv.addEventListener('click', () => {
+            selectInboxSuggestion(user.email);
+        });
+        
+        suggestionDiv.addEventListener('mouseenter', () => {
+            inboxSelectedSuggestionIndex = index;
+            updateInboxSelectedSuggestion();
+        });
+        
+        inboxAutocompleteSuggestions.appendChild(suggestionDiv);
+    });
+    
+    inboxAutocompleteSuggestions.style.display = 'block';
+    inboxSelectedSuggestionIndex = -1;
+}
+
+// Update selected suggestion for inbox compose
+function updateInboxSelectedSuggestion() {
+    const suggestions = document.querySelectorAll('#inboxAutocompleteSuggestions .autocomplete-suggestion');
+    suggestions.forEach((suggestion, index) => {
+        if (index === inboxSelectedSuggestionIndex) {
+            suggestion.classList.add('selected');
+        } else {
+            suggestion.classList.remove('selected');
+        }
+    });
+}
+
+// Select suggestion for inbox compose
+function selectInboxSuggestion(email) {
+    const toEmailInput = document.getElementById('toEmail');
+    toEmailInput.value = email;
+    document.getElementById('inboxAutocompleteSuggestions').style.display = 'none';
+    
+    // Show recipient info
+    const user = inboxUsers.find(u => u.email === email);
+    if (user) {
+        showInboxRecipientInfo(user);
+    } else {
+        hideInboxRecipientInfo();
+    }
+    
+    toEmailInput.focus();
+}
+
+// Show recipient info for inbox compose
+function showInboxRecipientInfo(user) {
+    const recipientInfo = document.getElementById('inboxRecipientInfo');
+    const recipientAvatar = document.getElementById('inboxRecipientAvatar');
+    const recipientName = document.getElementById('inboxRecipientName');
+    const recipientEmail = document.getElementById('inboxRecipientEmail');
+    
+    const avatar = generateAvatar(user.name, user.email);
+    
+    recipientAvatar.style.backgroundColor = avatar.backgroundColor;
+    recipientAvatar.textContent = avatar.initials;
+    recipientName.textContent = user.name;
+    recipientEmail.textContent = user.email;
+    
+    recipientInfo.style.display = 'flex';
+}
+
+// Hide recipient info for inbox compose
+function hideInboxRecipientInfo() {
+    const recipientInfo = document.getElementById('inboxRecipientInfo');
+    recipientInfo.style.display = 'none';
+}
+
+// Handle keyboard navigation for inbox compose
+function handleInboxKeydown(event) {
+    const suggestions = document.querySelectorAll('#inboxAutocompleteSuggestions .autocomplete-suggestion');
+    
+    if (suggestions.length === 0) return;
+    
+    switch (event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            inboxSelectedSuggestionIndex = Math.min(inboxSelectedSuggestionIndex + 1, suggestions.length - 1);
+            updateInboxSelectedSuggestion();
+            break;
+            
+        case 'ArrowUp':
+            event.preventDefault();
+            inboxSelectedSuggestionIndex = Math.max(inboxSelectedSuggestionIndex - 1, -1);
+            updateInboxSelectedSuggestion();
+            break;
+            
+        case 'Enter':
+            event.preventDefault();
+            if (inboxSelectedSuggestionIndex >= 0 && suggestions[inboxSelectedSuggestionIndex]) {
+                const email = suggestions[inboxSelectedSuggestionIndex].getAttribute('data-email');
+                selectInboxSuggestion(email);
+            }
+            break;
+            
+        case 'Escape':
+            document.getElementById('inboxAutocompleteSuggestions').style.display = 'none';
+            inboxSelectedSuggestionIndex = -1;
+            break;
+    }
 }
 
 // Compose attachment preview and removal
@@ -1466,14 +1874,51 @@ function deselectAllMails() {
     clearSelections();
 }
 
-function deleteSelectedMails() {
-    // Example: Remove from UI. You'd do AJAX here in a real app.
-    document.querySelectorAll('.email-item').forEach(item => {
-        if (selectedEmailIds.has(item.dataset.id) && item.style.display !== 'none') {
-            item.remove();
+async function deleteSelectedMails() {
+    if (selectedEmailIds.size === 0) {
+        showNotification('No emails selected for deletion', 'error');
+        return;
+    }
+    
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete ${selectedEmailIds.size} email(s)?`)) {
+        return;
+    }
+    
+    try {
+        const emailIds = Array.from(selectedEmailIds);
+        console.log('Deleting emails:', emailIds);
+        
+        const response = await fetch('/api/delete-emails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
+            body: JSON.stringify({ email_ids: emailIds }),
+            credentials: 'same-origin'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Remove from UI
+            document.querySelectorAll('.email-item').forEach(item => {
+                if (selectedEmailIds.has(item.dataset.id) && item.style.display !== 'none') {
+                    item.remove();
+                }
+            });
+            
+            clearSelections();
+            showNotification(`Successfully deleted ${result.deleted_count} email(s)`, 'success');
+        } else {
+            showNotification(`Failed to delete emails: ${result.error}`, 'error');
         }
-    });
-    clearSelections();
+        
+    } catch (error) {
+        console.error('Error deleting emails:', error);
+        showNotification('Error deleting emails. Please try again.', 'error');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {

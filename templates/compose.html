@@ -134,6 +134,63 @@ textarea { min-height: 200px; resize: vertical; }
     width: 100%;
 }
 
+.recipient-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: rgba(26, 115, 232, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(26, 115, 232, 0.2);
+}
+
+.recipient-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.recipient-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.recipient-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #202124;
+}
+
+.recipient-email {
+    font-size: 12px;
+    color: #5f6368;
+}
+
+/* Dark mode for recipient info */
+@media (prefers-color-scheme: dark) {
+    .recipient-info {
+        background-color: rgba(26, 115, 232, 0.1);
+        border-color: rgba(26, 115, 232, 0.3);
+    }
+    
+    .recipient-name {
+        color: #e8eaed;
+    }
+    
+    .recipient-email {
+        color: #9aa0a6;
+    }
+}
+
 .autocomplete-suggestions {
     position: absolute;
     top: 100%;
@@ -238,6 +295,13 @@ textarea { min-height: 200px; resize: vertical; }
         <div class="autocomplete-container">
             <input type="text" name="receiver" id="receiverInput" placeholder="To: user@example.com" value="{{ reply_data.reply_to or '' }}" required>
             <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
+            <div class="recipient-info" id="recipientInfo" style="display: none;">
+                <div class="recipient-avatar" id="recipientAvatar"></div>
+                <div class="recipient-details">
+                    <span class="recipient-name" id="recipientName"></span>
+                    <span class="recipient-email" id="recipientEmail"></span>
+                </div>
+            </div>
         </div>
         <input type="text" name="subject" placeholder="Subject" value="{{ reply_data.subject or '' }}">
         <textarea name="message" placeholder="Compose your message..." required>{{ reply_data.message or '' }}</textarea>
@@ -271,9 +335,14 @@ let selectedSuggestionIndex = -1;
 // Fetch users for auto-complete
 async function fetchUsers() {
     try {
+        console.log('Fetching users for auto-complete...');
         const response = await fetch('/api/users');
+        console.log('Response status:', response.status);
         if (response.ok) {
             users = await response.json();
+            console.log('Users fetched:', users.length);
+        } else {
+            console.error('Failed to fetch users:', response.status);
         }
     } catch (error) {
         console.error('Error fetching users:', error);
@@ -305,7 +374,8 @@ function generateAvatar(name, email) {
 
 // Show auto-complete suggestions
 function showSuggestions(query) {
-    if (!query || !query.includes('@')) {
+    console.log('Showing suggestions for:', query);
+    if (!query) {
         autocompleteSuggestions.style.display = 'none';
         return;
     }
@@ -325,7 +395,18 @@ function showSuggestions(query) {
         return;
     }
     
-    // Filter users based on query
+    // If typing after @, filter by domain
+    if (afterAt && afterAt.length > 0) {
+        const suggestions = users.filter(user => 
+            user.email.toLowerCase().includes(query.toLowerCase()) ||
+            user.name.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 5);
+        
+        displaySuggestions(suggestions, query);
+        return;
+    }
+    
+    // Filter users based on query (before @)
     const suggestions = users.filter(user => 
         user.email.toLowerCase().includes(query.toLowerCase()) ||
         user.name.toLowerCase().includes(query.toLowerCase())
@@ -336,6 +417,7 @@ function showSuggestions(query) {
 
 // Display suggestions in the dropdown
 function displaySuggestions(suggestions, query) {
+    console.log('Displaying suggestions:', suggestions.length, 'for query:', query);
     if (suggestions.length === 0) {
         autocompleteSuggestions.style.display = 'none';
         return;
@@ -392,7 +474,39 @@ function updateSelectedSuggestion() {
 function selectSuggestion(email) {
     receiverInput.value = email;
     autocompleteSuggestions.style.display = 'none';
+    
+    // Show recipient info
+    const user = users.find(u => u.email === email);
+    if (user) {
+        showRecipientInfo(user);
+    } else {
+        hideRecipientInfo();
+    }
+    
     receiverInput.focus();
+}
+
+// Show recipient info
+function showRecipientInfo(user) {
+    const recipientInfo = document.getElementById('recipientInfo');
+    const recipientAvatar = document.getElementById('recipientAvatar');
+    const recipientName = document.getElementById('recipientName');
+    const recipientEmail = document.getElementById('recipientEmail');
+    
+    const avatar = generateAvatar(user.name, user.email);
+    
+    recipientAvatar.style.backgroundColor = avatar.backgroundColor;
+    recipientAvatar.textContent = avatar.initials;
+    recipientName.textContent = user.name;
+    recipientEmail.textContent = user.email;
+    
+    recipientInfo.style.display = 'flex';
+}
+
+// Hide recipient info
+function hideRecipientInfo() {
+    const recipientInfo = document.getElementById('recipientInfo');
+    recipientInfo.style.display = 'none';
 }
 
 // Handle keyboard navigation
@@ -431,7 +545,30 @@ function handleKeydown(event) {
 
 // Event listeners
 receiverInput.addEventListener('input', (e) => {
-    showSuggestions(e.target.value);
+    const value = e.target.value;
+    console.log('Input value:', value);
+    
+    // Hide recipient info if input is cleared
+    if (!value) {
+        hideRecipientInfo();
+    }
+    
+    // Auto-complete @bharatmail.in when @ is typed
+    if (value.includes('@') && !value.includes('@bharatmail.in')) {
+        const atIndex = value.lastIndexOf('@');
+        const beforeAt = value.substring(0, atIndex);
+        const afterAt = value.substring(atIndex + 1);
+        
+        // If just @ is typed, auto-complete with bharatmail.in
+        if (afterAt === '') {
+            const newValue = beforeAt + '@bharatmail.in';
+            receiverInput.value = newValue;
+            // Set cursor position after @
+            receiverInput.setSelectionRange(atIndex + 1, atIndex + 1);
+        }
+    }
+    
+    showSuggestions(value);
 });
 
 receiverInput.addEventListener('keydown', handleKeydown);

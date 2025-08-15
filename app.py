@@ -174,13 +174,24 @@ def format_time(timestamp_str):
         if not timestamp_str:
             return "Unknown"
         
-        # Parse timestamp
+        # Parse timestamp - handle microseconds and different formats
         if 'T' in timestamp_str:
-            # ISO format
+            # ISO format - remove microseconds if present
+            timestamp_str = timestamp_str.split('.')[0] if '.' in timestamp_str else timestamp_str
             dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
         else:
-            # Legacy format
-            dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+            # Legacy format - handle microseconds
+            if '.' in timestamp_str:
+                timestamp_str = timestamp_str.split('.')[0]
+            try:
+                dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                # Try other possible formats
+                try:
+                    dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S.%f')
+                except ValueError:
+                    # If all parsing fails, return original
+                    return timestamp_str
         
         now = datetime.now()
         diff = now - dt.replace(tzinfo=None) if dt.tzinfo else now - dt
@@ -203,6 +214,36 @@ def format_time(timestamp_str):
         print(f"Error formatting time {timestamp_str}: {e}")
         return "Unknown"
 
+def parse_timestamp_for_sorting(timestamp_str):
+    """Parse timestamp for sorting purposes - returns datetime object"""
+    try:
+        if not timestamp_str:
+            return datetime.min
+        
+        # Parse timestamp - handle microseconds and different formats
+        if 'T' in timestamp_str:
+            # ISO format - remove microseconds if present
+            timestamp_str = timestamp_str.split('.')[0] if '.' in timestamp_str else timestamp_str
+            return datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        else:
+            # Legacy format - handle microseconds
+            if '.' in timestamp_str:
+                timestamp_str = timestamp_str.split('.')[0]
+            try:
+                return datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                # Try other possible formats
+                try:
+                    return datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S.%f')
+                except ValueError:
+                    # If all parsing fails, return minimum datetime
+                    print(f"Warning: Could not parse timestamp for sorting: {timestamp_str}")
+                    return datetime.min
+            
+    except Exception as e:
+        print(f"Error parsing timestamp for sorting {timestamp_str}: {e}")
+        return datetime.min
+
 def enhance_email_data(mail, current_email):
     """Enhance email data with avatar, name, and formatted time"""
     try:
@@ -213,35 +254,23 @@ def enhance_email_data(mail, current_email):
         message = mail.get('message', '')
         mail['message_preview'] = message[:100] + '...' if len(message) > 100 else message
         
-        # Handle inbox emails (received)
-        if mail.get('receiver') == current_email:
-            sender_email = mail.get('sender')
+        # Always get sender data
+        sender_email = mail.get('sender')
+        if sender_email:
             sender_data = get_user_avatar_data(sender_email)
-            
             mail['sender_name'] = sender_data['name']
             mail['sender_initials'] = sender_data['initials']
             mail['sender_avatar_color'] = sender_data['avatar_color']
             mail['sender_avatar'] = sender_data['avatar']
         
-        # Handle sent emails
-        elif mail.get('sender') == current_email:
-            receiver_email = mail.get('receiver')
+        # Always get receiver data
+        receiver_email = mail.get('receiver')
+        if receiver_email:
             receiver_data = get_user_avatar_data(receiver_email)
-            
             mail['receiver_name'] = receiver_data['name']
             mail['receiver_initials'] = receiver_data['initials']
             mail['receiver_avatar_color'] = receiver_data['avatar_color']
             mail['receiver_avatar'] = receiver_data['avatar']
-        
-        # Handle drafts
-        else:
-            receiver_email = mail.get('receiver')
-            if receiver_email:
-                receiver_data = get_user_avatar_data(receiver_email)
-                mail['receiver_name'] = receiver_data['name']
-                mail['receiver_initials'] = receiver_data['initials']
-                mail['receiver_avatar_color'] = receiver_data['avatar_color']
-                mail['receiver_avatar'] = receiver_data['avatar']
         
     except Exception as e:
         print(f"Error enhancing email data: {e}")
@@ -443,21 +472,6 @@ def inbox():
             m['id'] = key
             messages.append(m)
     
-    # Sort messages by timestamp (newest first)
-    try:
-        messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01 00:00:00')), reverse=True)
-    except:
-        # Fallback sorting if timestamp format is different
-        messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-
-    search_query = request.args.get("search", "").lower()
-    if search_query:
-        messages = [
-            m for m in messages
-            if search_query in m.get("subject", "").lower()
-            or search_query in m.get("message", "").lower()
-        ]
-
     # Categorize mails and enhance with avatar data
     categorized_mails = {
         "Inbox": [],
@@ -465,9 +479,51 @@ def inbox():
         "Social": [],
         "Updates": []
     }
+    
+    # Enhance all messages first
+    enhanced_messages = []
     for mail in messages:
-        # Enhance email data with avatars, names, and formatted times
         enhanced_mail = enhance_email_data(mail, current_email)
+        enhanced_messages.append(enhanced_mail)
+    
+    # Debug: Print first few timestamps to see the format
+    if enhanced_messages:
+        print(f"\n=== TIMESTAMP DEBUG ===")
+        for i, msg in enumerate(enhanced_messages[:3]):
+            print(f"Message {i+1}: {msg.get('timestamp')} -> {msg.get('formatted_time')}")
+        print(f"=== END TIMESTAMP DEBUG ===\n")
+    
+    # Sort enhanced messages by timestamp (newest first)
+    try:
+        enhanced_messages.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        print(f"Sorted {len(enhanced_messages)} messages by timestamp")
+        
+        # Debug: Show first few sorted messages
+        if enhanced_messages:
+            print(f"\n=== SORTED MESSAGES DEBUG ===")
+            for i, msg in enumerate(enhanced_messages[:5]):
+                timestamp = msg.get('timestamp', 'Unknown')
+                formatted_time = msg.get('formatted_time', 'Unknown')
+                print(f"Message {i+1}: {timestamp} -> {formatted_time}")
+            print(f"=== END SORTED MESSAGES DEBUG ===\n")
+            
+    except Exception as e:
+        print(f"Error sorting messages: {e}")
+        # Fallback sorting if timestamp format is different
+        enhanced_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        print(f"Sorted {len(enhanced_messages)} messages by string timestamp")
+    
+    # Apply search filter if needed
+    search_query = request.args.get("search", "").lower()
+    if search_query:
+        enhanced_messages = [
+            m for m in enhanced_messages
+            if search_query in m.get("subject", "").lower()
+            or search_query in m.get("message", "").lower()
+        ]
+    
+    # Categorize the sorted messages
+    for enhanced_mail in enhanced_messages:
         category = categorize_mail(enhanced_mail.get("subject", ""), enhanced_mail.get("message", ""))
         categorized_mails[category].append(enhanced_mail)
 
@@ -478,17 +534,21 @@ def inbox():
         m['id'] = key
         sent_messages.append(m)
     
-    # Sort sent messages by timestamp (newest first) and enhance with avatar data
-    try:
-        sent_messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01 00:00:00')), reverse=True)
-    except:
-        sent_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-    
-    # Enhance sent messages with avatar data
+    # Enhance sent messages first
     enhanced_sent_messages = []
     for mail in sent_messages:
         enhanced_mail = enhance_email_data(mail, current_email)
         enhanced_sent_messages.append(enhanced_mail)
+    
+    # Sort enhanced sent messages by timestamp (newest first)
+    try:
+        enhanced_sent_messages.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        print(f"Sorted {len(enhanced_sent_messages)} sent messages by timestamp")
+    except Exception as e:
+        print(f"Error sorting sent messages: {e}")
+        enhanced_sent_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        print(f"Sorted {len(enhanced_sent_messages)} sent messages by string timestamp")
+    
     categorized_mails["Sent"] = enhanced_sent_messages
 
     # Fetch Draft mails
@@ -498,17 +558,21 @@ def inbox():
         m['id'] = key
         draft_messages.append(m)
     
-    # Sort draft messages by timestamp (newest first) and enhance with avatar data
-    try:
-        draft_messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01 00:00:00')), reverse=True)
-    except:
-        draft_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-    
-    # Enhance draft messages with avatar data
+    # Enhance draft messages first
     enhanced_draft_messages = []
     for mail in draft_messages:
         enhanced_mail = enhance_email_data(mail, current_email)
         enhanced_draft_messages.append(enhanced_mail)
+    
+    # Sort enhanced draft messages by timestamp (newest first)
+    try:
+        enhanced_draft_messages.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        print(f"Sorted {len(enhanced_draft_messages)} draft messages by timestamp")
+    except Exception as e:
+        print(f"Error sorting draft messages: {e}")
+        enhanced_draft_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        print(f"Sorted {len(enhanced_draft_messages)} draft messages by string timestamp")
+    
     categorized_mails["Drafts"] = enhanced_draft_messages
 
     accounts = session.get('accounts', [])
@@ -1021,7 +1085,13 @@ def read_mail(mail_id):
         flash("Mail not found.")
         return redirect("/inbox")
 
-    return render_template("read_mail.html", mail=mail)
+    # Enhance mail data with avatar and name information
+    enhanced_mail = enhance_email_data(mail, current_email)
+    
+    # Add formatted timestamp
+    enhanced_mail['formatted_timestamp'] = format_time(mail.get('timestamp'))
+
+    return render_template("read_mail.html", mail=enhanced_mail)
 
 # Route to serve uploaded attachments
 @app.route("/uploads/<filename>")
@@ -1231,6 +1301,17 @@ def refresh_emails():
                 m['id'] = key
                 messages.append(m)
         
+        # Sort messages by timestamp (newest first)
+        try:
+            messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01T00:00:00')), reverse=True)
+        except:
+            try:
+                # Try legacy format
+                messages.sort(key=lambda x: datetime.strptime(x.get('timestamp', '1970-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S'), reverse=True)
+            except:
+                # Fallback sorting if timestamp format is different
+                messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
         # Categorize mails and enhance with avatar data
         categorized_mails = {
             "Inbox": [],
@@ -1238,9 +1319,23 @@ def refresh_emails():
             "Social": [],
             "Updates": []
         }
+        
+        # Enhance all messages first
+        enhanced_messages = []
         for mail in messages:
-            # Enhance email data with avatars, names, and formatted times
             enhanced_mail = enhance_email_data(mail, current_email)
+            enhanced_messages.append(enhanced_mail)
+        
+        # Sort enhanced messages by timestamp (newest first)
+        try:
+            enhanced_messages.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        except Exception as e:
+            print(f"Error sorting messages in refresh: {e}")
+            # Fallback sorting if timestamp format is different
+            enhanced_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        # Categorize the sorted messages
+        for enhanced_mail in enhanced_messages:
             category = categorize_mail(enhanced_mail.get("subject", ""), enhanced_mail.get("message", ""))
             categorized_mails[category].append(enhanced_mail)
         
@@ -1251,11 +1346,29 @@ def refresh_emails():
             m['id'] = key
             sent_messages.append(m)
         
-        # Enhance sent messages with avatar data
+        # Sort sent messages by timestamp (newest first)
+        try:
+            sent_messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01T00:00:00')), reverse=True)
+        except:
+            try:
+                # Try legacy format
+                sent_messages.sort(key=lambda x: datetime.strptime(x.get('timestamp', '1970-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S'), reverse=True)
+            except:
+                sent_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        # Enhance sent messages first
         enhanced_sent_messages = []
         for mail in sent_messages:
             enhanced_mail = enhance_email_data(mail, current_email)
             enhanced_sent_messages.append(enhanced_mail)
+        
+        # Sort enhanced sent messages by timestamp (newest first)
+        try:
+            enhanced_sent_messages.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        except Exception as e:
+            print(f"Error sorting sent messages in refresh: {e}")
+            enhanced_sent_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
         categorized_mails["Sent"] = enhanced_sent_messages
         
         # Fetch Draft mails
@@ -1265,11 +1378,29 @@ def refresh_emails():
             m['id'] = key
             draft_messages.append(m)
         
-        # Enhance draft messages with avatar data
+        # Sort draft messages by timestamp (newest first)
+        try:
+            draft_messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01T00:00:00')), reverse=True)
+        except:
+            try:
+                # Try legacy format
+                draft_messages.sort(key=lambda x: datetime.strptime(x.get('timestamp', '1970-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S'), reverse=True)
+            except:
+                draft_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        # Enhance draft messages first
         enhanced_draft_messages = []
         for mail in draft_messages:
             enhanced_mail = enhance_email_data(mail, current_email)
             enhanced_draft_messages.append(enhanced_mail)
+        
+        # Sort enhanced draft messages by timestamp (newest first)
+        try:
+            enhanced_draft_messages.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        except Exception as e:
+            print(f"Error sorting draft messages in refresh: {e}")
+            enhanced_draft_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
         categorized_mails["Drafts"] = enhanced_draft_messages
         
         return jsonify({
@@ -1301,6 +1432,7 @@ def get_users():
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
+        print(f"Fetching users for auto-complete. Current user: {current_email}")
         # Fetch all users from Firebase
         users_ref = firebase.ref.child("users").get() or {}
         users = []
@@ -1326,11 +1458,69 @@ def get_users():
                     'last_name': last_name
                 })
         
+        print(f"Returning {len(users)} users for auto-complete")
         return jsonify(users)
         
     except Exception as e:
         print(f"Error fetching users: {e}")
         return jsonify({'error': 'Failed to fetch users'}), 500
+
+# API endpoint to delete emails
+@app.route("/api/delete-emails", methods=["POST"])
+def delete_emails():
+    current_email = session.get('user_email')
+    if not current_email:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Validate CSRF token
+    csrf_token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not validate_csrf_token(csrf_token):
+        return jsonify({'error': 'Invalid CSRF token'}), 403
+    
+    try:
+        data = request.get_json()
+        if not data or 'email_ids' not in data:
+            return jsonify({'error': 'No email IDs provided'}), 400
+        
+        email_ids = data['email_ids']
+        user_key = current_email.replace(".", ",")
+        deleted_count = 0
+        
+        # Delete from inbox
+        inbox_ref = firebase.ref.child("inbox").child(user_key)
+        for email_id in email_ids:
+            try:
+                inbox_ref.child(email_id).delete()
+                deleted_count += 1
+            except Exception as e:
+                print(f"Error deleting email {email_id} from inbox: {e}")
+        
+        # Delete from sent
+        sent_ref = firebase.ref.child("sent").child(user_key)
+        for email_id in email_ids:
+            try:
+                sent_ref.child(email_id).delete()
+            except Exception as e:
+                print(f"Error deleting email {email_id} from sent: {e}")
+        
+        # Delete from drafts
+        drafts_ref = firebase.ref.child("drafts").child(user_key)
+        for email_id in email_ids:
+            try:
+                drafts_ref.child(email_id).delete()
+            except Exception as e:
+                print(f"Error deleting email {email_id} from drafts: {e}")
+        
+        print(f"Deleted {deleted_count} emails for user {current_email}")
+        return jsonify({
+            'success': True,
+            'deleted_count': deleted_count,
+            'message': f'Successfully deleted {deleted_count} emails'
+        })
+        
+    except Exception as e:
+        print(f"Error deleting emails: {e}")
+        return jsonify({'error': 'Failed to delete emails'}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5001))

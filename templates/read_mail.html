@@ -88,13 +88,80 @@
 
     .mail-meta-item {
         display: flex;
-        align-items: center;
-        gap: 8px;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
     }
 
     .mail-meta-label {
         font-weight: 600;
         min-width: 60px;
+        margin-top: 4px;
+    }
+
+    .sender-info, .receiver-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+    }
+
+    .sender-avatar, .receiver-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .avatar-initials {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+        font-size: 16px;
+        text-transform: uppercase;
+    }
+
+    .sender-details, .receiver-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+    }
+
+    .sender-name, .receiver-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #202124;
+    }
+
+    .sender-email, .receiver-email {
+        font-size: 13px;
+        color: #5f6368;
+    }
+
+    /* Dark mode for sender/receiver info */
+    @media (prefers-color-scheme: dark) {
+        .sender-name, .receiver-name {
+            color: #e8eaed;
+        }
+        
+        .sender-email, .receiver-email {
+            color: #9aa0a6;
+        }
     }
 
     .mail-content {
@@ -261,11 +328,39 @@
                 <div class="mail-meta">
                     <div class="mail-meta-item">
                         <span class="mail-meta-label">From:</span>
-                        <span>{{ mail.sender }}</span>
+                        <div class="sender-info">
+                            <div class="sender-avatar">
+                                {% if mail.sender_avatar %}
+                                    <img src="{{ mail.sender_avatar }}" alt="Avatar" class="avatar-img">
+                                {% else %}
+                                    <div class="avatar-initials" style="background-color: {{ mail.sender_avatar_color }};">
+                                        {{ mail.sender_initials }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="sender-details">
+                                <span class="sender-name">{{ mail.sender_name or mail.sender }}</span>
+                                <span class="sender-email">{{ mail.sender }}</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="mail-meta-item">
                         <span class="mail-meta-label">To:</span>
-                        <span>{{ mail.receiver }}</span>
+                        <div class="receiver-info">
+                            <div class="receiver-avatar">
+                                {% if mail.receiver_avatar %}
+                                    <img src="{{ mail.receiver_avatar }}" alt="Avatar" class="avatar-img">
+                                {% else %}
+                                    <div class="avatar-initials" style="background-color: {{ mail.receiver_avatar_color }};">
+                                        {{ mail.receiver_initials }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="receiver-details">
+                                <span class="receiver-name">{{ mail.receiver_name or mail.receiver }}</span>
+                                <span class="receiver-email">{{ mail.receiver }}</span>
+                            </div>
+                        </div>
                     </div>
                     {% if mail.cc %}
                     <div class="mail-meta-item">
@@ -281,7 +376,7 @@
                     {% endif %}
                     <div class="mail-meta-item">
                         <span class="mail-meta-label">Date:</span>
-                        <span class="timestamp">{{ mail.timestamp }}</span>
+                        <span class="timestamp">{{ mail.formatted_timestamp }}</span>
                     </div>
                 </div>
             </div>
