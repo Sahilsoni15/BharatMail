@@ -220,21 +220,29 @@
         h2 { font-size: 22px; }
     }
     
-    /* Additional mobile fixes for email field */
+    /* Additional mobile fixes for complete registration box */
     @media (max-width: 480px) {
-        .left-side, .right-side { padding: 15px; }
-        body { padding: 5px; }
+        .left-side, .right-side { padding: 12px; }
+        body { padding: 3px; }
         
-        /* Keep horizontal layout but adjust proportions */
+        /* Adjust complete registration container */
+        .card {
+            margin: 0;
+            width: 98%;
+            max-width: none;
+            transform: translateX(-1%);
+        }
+        
+        /* Keep horizontal layout but adjust proportions for email field */
         .email-container input {
-            flex: 0.6 !important; /* Make username input smaller */
-            max-width: 60% !important;
+            flex: 0.55 !important;
+            max-width: 55% !important;
         }
         
         .email-container span {
-            flex: 0.4 !important;
+            flex: 0.45 !important;
             font-size: 11px;
-            margin-left: 3px !important;
+            margin-left: 4px !important;
             text-align: left;
         }
     }
