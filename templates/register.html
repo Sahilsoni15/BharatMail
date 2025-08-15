@@ -225,21 +225,17 @@
         .left-side, .right-side { padding: 15px; }
         body { padding: 5px; }
         
-        /* Stack email field vertically on very small screens */
-        .email-container {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-        }
-        
+        /* Keep horizontal layout but adjust proportions */
         .email-container input {
-            width: 100% !important;
-            margin-bottom: 8px !important;
+            flex: 0.6 !important; /* Make username input smaller */
+            max-width: 60% !important;
         }
         
         .email-container span {
-            margin-left: 0 !important;
-            font-size: 12px;
-            opacity: 0.8;
+            flex: 0.4 !important;
+            font-size: 11px;
+            margin-left: 3px !important;
+            text-align: left;
         }
     }
 </style>
