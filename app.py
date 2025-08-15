@@ -17,6 +17,7 @@ def make_session_permanent():
 
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 
+# Updated domain from @bharatmail.free.nf to @bharatmail.in for custom domain
 EMAIL_SUFFIX = "@bharatmail.in"
 UPLOAD_FOLDER = "static/profile_pics"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
