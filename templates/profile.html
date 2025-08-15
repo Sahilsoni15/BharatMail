@@ -218,7 +218,7 @@
             <label for="profile_pic" class="change-photo" title="Change photo">
                 <i class="fas fa-camera"></i>
             </label>
-            <input type="file" name="profile_pic" id="profile_pic" style="display:none;">
+            <input type="file" name="profile_pic" id="profile_pic" accept="image/*" style="display:none;">
         </div>
 
         <!-- Name -->
@@ -247,6 +247,46 @@
     </form>
     </form>
 </div>
+
+<script>
+// Handle profile picture file input change
+document.getElementById('profile_pic').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    const profileWrapper = document.querySelector('.profile-wrapper');
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Remove existing profile pic or initials
+            const existingImg = profileWrapper.querySelector('img');
+            const existingDiv = profileWrapper.querySelector('.profile-pic');
+            
+            if (existingImg) {
+                existingImg.remove();
+            }
+            if (existingDiv) {
+                existingDiv.remove();
+            }
+            
+            // Create new image element
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = 'Profile Picture';
+            img.className = 'profile-pic';
+            
+            // Insert before the label (camera button)
+            const label = profileWrapper.querySelector('label');
+            profileWrapper.insertBefore(img, label);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Handle camera button click
+document.querySelector('.change-photo').addEventListener('click', function() {
+    document.getElementById('profile_pic').click();
+});
+</script>
 
 </body>
 </html>

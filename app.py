@@ -487,31 +487,40 @@ def update_profile():
         updates["profile_pic"] = generate_avatar(first_name, last_name)
     elif "profile_pic" in request.files:
         file = request.files["profile_pic"]
-        if file.filename:
-            import base64
-            from io import BytesIO
-            
-            # Open the uploaded image
-            img = Image.open(file)
+        if file and file.filename:
+            try:
+                import base64
+                from io import BytesIO
+                
+                # Reset file pointer to beginning
+                file.seek(0)
+                
+                # Open the uploaded image
+                img = Image.open(file)
 
-            # Crop to square (center crop)
-            width, height = img.size
-            min_dim = min(width, height)
-            left = (width - min_dim) / 2
-            top = (height - min_dim) / 2
-            right = (width + min_dim) / 2
-            bottom = (height + min_dim) / 2
-            img = img.crop((left, top, right, bottom))
+                # Crop to square (center crop)
+                width, height = img.size
+                min_dim = min(width, height)
+                left = (width - min_dim) / 2
+                top = (height - min_dim) / 2
+                right = (width + min_dim) / 2
+                bottom = (height + min_dim) / 2
+                img = img.crop((left, top, right, bottom))
 
-            # Resize to standard profile size
-            img = img.resize((200, 200))
+                # Resize to standard profile size
+                img = img.resize((200, 200))
 
-            # Convert to base64 data URL for cloud deployment compatibility
-            buffer = BytesIO()
-            img.save(buffer, format='PNG')
-            img_data = buffer.getvalue()
-            img_base64 = base64.b64encode(img_data).decode('utf-8')
-            updates["profile_pic"] = f"data:image/png;base64,{img_base64}"
+                # Convert to base64 data URL for cloud deployment compatibility
+                buffer = BytesIO()
+                img.save(buffer, format='PNG')
+                img_data = buffer.getvalue()
+                img_base64 = base64.b64encode(img_data).decode('utf-8')
+                updates["profile_pic"] = f"data:image/png;base64,{img_base64}"
+                
+                flash("Profile picture updated successfully!")
+            except Exception as e:
+                print(f"Error processing profile picture: {e}")
+                flash("Error updating profile picture. Please try again.")
 
     user_ref.update(updates)
     flash("Profile updated successfully!")
