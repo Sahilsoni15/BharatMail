@@ -32,6 +32,8 @@
         font-family: Arial, sans-serif;
         display: flex;
         height: 100vh;
+        overflow-x: hidden;
+        box-sizing: border-box;
     }
 
     .sidebar {
@@ -307,6 +309,32 @@
         flex-direction: column;
         z-index: 400;
         overflow-y: auto;
+    }
+
+    /* Mobile compose panel */
+    @media (max-width: 768px) {
+        .compose-panel {
+            width: 100vw;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            border-left: none;
+            box-shadow: none;
+        }
+        
+        .dropdown {
+            width: 90vw;
+            max-width: 280px;
+            right: 5vw;
+        }
+        
+        .top-bar {
+            padding: 0 15px;
+        }
+        
+        .email-section {
+            padding: 5px;
+        }
     }
 
     .compose-panel header {
