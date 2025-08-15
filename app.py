@@ -65,14 +65,34 @@ def generate_avatar(first_name, last_name, font_path="DejaVuSans-Bold.ttf"):
         initials = "U"
 
     bg_color = random.choice(AVATAR_COLORS)
-    img_size = 120
+    # Create high-resolution image for better quality
+    img_size = 400  # Increased from 120 to 400 for better quality
     img = Image.new("RGB", (img_size, img_size), bg_color)
     draw = ImageDraw.Draw(img)
 
+    # Add subtle gradient effect
+    from PIL import ImageDraw, ImageFilter
+    
+    # Create a subtle inner shadow/gradient effect
+    overlay = Image.new('RGBA', (img_size, img_size), (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    
+    # Add a subtle vignette effect
+    for i in range(20):
+        alpha = int(255 * (i / 20) * 0.1)  # Very subtle
+        overlay_draw.ellipse(
+            [i, i, img_size-i, img_size-i], 
+            outline=None, 
+            fill=(0, 0, 0, alpha)
+        )
+    
+    img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+    draw = ImageDraw.Draw(img)
+
     # Dynamically pick the largest font size that fits well
-    fontsize = int(img_size * 0.9)
+    fontsize = int(img_size * 0.4)  # Adjusted proportion for larger image
     font = None
-    while fontsize > 10:
+    while fontsize > 40:  # Minimum font size increased
         try:
             font = ImageFont.truetype(font_path, fontsize)
         except:
@@ -81,21 +101,32 @@ def generate_avatar(first_name, last_name, font_path="DejaVuSans-Bold.ttf"):
         bbox = draw.textbbox((0, 0), initials, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
-        # Leave 10% padding
-        if text_width < img_size * 0.85 and text_height < img_size * 0.75:
+        # Leave appropriate padding
+        if text_width < img_size * 0.7 and text_height < img_size * 0.7:
             break
-        fontsize -= 2
+        fontsize -= 8  # Larger steps for efficiency
 
-    # Center the text
+    # Center the text with better positioning
     bbox = draw.textbbox((0, 0), initials, font=font)
     w = bbox[2] - bbox[0]
     h = bbox[3] - bbox[1]
-    position = ((img_size - w)/2, (img_size - h)/2)
-    draw.text(position, initials, fill="white", font=font)
+    x = (img_size - w) / 2
+    y = (img_size - h) / 2 - (bbox[1] / 2)  # Adjust for font baseline
+    
+    # Add text shadow for depth
+    shadow_offset = 2
+    draw.text((x + shadow_offset, y + shadow_offset), initials, fill=(0, 0, 0, 30), font=font)
+    
+    # Draw main text
+    draw.text((x, y), initials, fill="white", font=font)
+
+    # Apply anti-aliasing by resizing if needed
+    if img_size > 200:
+        img = img.resize((200, 200), Image.Resampling.LANCZOS)
 
     # Convert to base64 data URL for cloud deployment compatibility
     buffer = BytesIO()
-    img.save(buffer, format='PNG')
+    img.save(buffer, format='PNG', quality=95)
     img_data = buffer.getvalue()
     img_base64 = base64.b64encode(img_data).decode('utf-8')
     return f"data:image/png;base64,{img_base64}"
