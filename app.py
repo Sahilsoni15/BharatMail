@@ -15,7 +15,7 @@ app.permanent_session_lifetime = timedelta(days=30)
 def make_session_permanent():
     session.permanent = True
 
-app.secret_key = "YOUR_SECRET_KEY"
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 
 EMAIL_SUFFIX = "@bharatmail.free.nf"
 UPLOAD_FOLDER = "static/profile_pics"
@@ -596,4 +596,6 @@ def read_mail(mail_id):
     return render_template("read_mail.html", mail=mail)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV', 'production') == 'development'
+    app.run(host='0.0.0.0', port=port, debug=debug)
