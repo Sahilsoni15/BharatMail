@@ -368,10 +368,109 @@
         padding: 12px;
         border-bottom: 1px solid rgba(128,128,128,0.2);
         cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        transition: background-color 0.2s ease;
     }
 
-    .email-item strong {
-        display: block;
+    .email-avatar {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .avatar-initials {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+        font-size: 16px;
+        text-transform: uppercase;
+    }
+
+    .draft-avatar {
+        font-size: 18px;
+    }
+
+    .email-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .email-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .email-sender {
+        font-weight: 600;
+        font-size: 14px;
+        color: #202124;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .email-time {
+        font-size: 12px;
+        color: #5f6368;
+        flex-shrink: 0;
+    }
+
+    .email-subject {
+        font-weight: 500;
+        font-size: 14px;
+        color: #202124;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .email-preview {
+        font-size: 13px;
+        color: #5f6368;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        line-height: 1.4;
+    }
+
+    /* Dark mode for email items */
+    @media (prefers-color-scheme: dark) {
+        .email-sender {
+            color: #e8eaed;
+        }
+        
+        .email-subject {
+            color: #e8eaed;
+        }
+        
+        .email-time,
+        .email-preview {
+            color: #9aa0a6;
+        }
     }
 
     /* Sidebar toggle for all screens */
@@ -720,49 +819,135 @@
         <div class="email-list" id="mailList">
             <!-- Inbox Messages -->
             {% for m in categorized_mails['Inbox'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Inbox">
-                <strong>{{ m.sender }}</strong>
-                <span>{{ m.subject }}</span>
+            <div class="email-item" data-id="{{ m.id }}" data-category="Inbox" data-timestamp="{{ m.timestamp }}">
+                <div class="email-avatar">
+                    {% if m.sender_avatar %}
+                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
+                    {% else %}
+                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
+                            {{ m.sender_initials }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="email-content">
+                    <div class="email-header">
+                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
+                        <span class="email-time">{{ m.formatted_time }}</span>
+                    </div>
+                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
+                    <div class="email-preview">{{ m.message_preview }}</div>
+                </div>
             </div>
             {% endfor %}
             
             <!-- Promotions Messages -->
             {% for m in categorized_mails['Promotions'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Promotions">
-                <strong>{{ m.sender }}</strong>
-                <span>{{ m.subject }}</span>
+            <div class="email-item" data-id="{{ m.id }}" data-category="Promotions" data-timestamp="{{ m.timestamp }}">
+                <div class="email-avatar">
+                    {% if m.sender_avatar %}
+                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
+                    {% else %}
+                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
+                            {{ m.sender_initials }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="email-content">
+                    <div class="email-header">
+                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
+                        <span class="email-time">{{ m.formatted_time }}</span>
+                    </div>
+                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
+                    <div class="email-preview">{{ m.message_preview }}</div>
+                </div>
             </div>
             {% endfor %}
             
             <!-- Social Messages -->
             {% for m in categorized_mails['Social'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Social">
-                <strong>{{ m.sender }}</strong>
-                <span>{{ m.subject }}</span>
+            <div class="email-item" data-id="{{ m.id }}" data-category="Social" data-timestamp="{{ m.timestamp }}">
+                <div class="email-avatar">
+                    {% if m.sender_avatar %}
+                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
+                    {% else %}
+                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
+                            {{ m.sender_initials }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="email-content">
+                    <div class="email-header">
+                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
+                        <span class="email-time">{{ m.formatted_time }}</span>
+                    </div>
+                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
+                    <div class="email-preview">{{ m.message_preview }}</div>
+                </div>
             </div>
             {% endfor %}
             
             <!-- Updates Messages -->
             {% for m in categorized_mails['Updates'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Updates">
-                <strong>{{ m.sender }}</strong>
-                <span>{{ m.subject }}</span>
+            <div class="email-item" data-id="{{ m.id }}" data-category="Updates" data-timestamp="{{ m.timestamp }}">
+                <div class="email-avatar">
+                    {% if m.sender_avatar %}
+                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
+                    {% else %}
+                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
+                            {{ m.sender_initials }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="email-content">
+                    <div class="email-header">
+                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
+                        <span class="email-time">{{ m.formatted_time }}</span>
+                    </div>
+                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
+                    <div class="email-preview">{{ m.message_preview }}</div>
+                </div>
             </div>
             {% endfor %}
             
             <!-- Sent Messages -->
             {% for m in categorized_mails['Sent'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Sent">
-                <strong>To: {{ m.receiver }}</strong>
-                <span>{{ m.subject }}</span>
+            <div class="email-item" data-id="{{ m.id }}" data-category="Sent" data-timestamp="{{ m.timestamp }}">
+                <div class="email-avatar">
+                    {% if m.receiver_avatar %}
+                        <img src="{{ m.receiver_avatar }}" alt="Avatar" class="avatar-img">
+                    {% else %}
+                        <div class="avatar-initials" style="background-color: {{ m.receiver_avatar_color }};">
+                            {{ m.receiver_initials }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="email-content">
+                    <div class="email-header">
+                        <strong class="email-sender">To: {{ m.receiver_name or m.receiver }}</strong>
+                        <span class="email-time">{{ m.formatted_time }}</span>
+                    </div>
+                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
+                    <div class="email-preview">{{ m.message_preview }}</div>
+                </div>
             </div>
             {% endfor %}
             
             <!-- Draft Messages -->
             {% for m in categorized_mails['Drafts'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Drafts">
-                <strong>Draft to: {{ m.receiver or 'No recipient' }}</strong>
-                <span>{{ m.subject or '(No subject)' }}</span>
+            <div class="email-item" data-id="{{ m.id }}" data-category="Drafts" data-timestamp="{{ m.timestamp }}">
+                <div class="email-avatar">
+                    <div class="avatar-initials draft-avatar" style="background-color: #FF9800;">
+                        <i class="fa-solid fa-file-lines"></i>
+                    </div>
+                </div>
+                <div class="email-content">
+                    <div class="email-header">
+                        <strong class="email-sender">Draft to: {{ m.receiver_name or m.receiver or 'No recipient' }}</strong>
+                        <span class="email-time">{{ m.formatted_time }}</span>
+                    </div>
+                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
+                    <div class="email-preview">{{ m.message_preview }}</div>
+                </div>
             </div>
             {% endfor %}
         </div>

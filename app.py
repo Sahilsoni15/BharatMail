@@ -120,6 +120,134 @@ def categorize_mail(subject, message):
     else:
         return "Inbox"
 
+def get_user_avatar_data(email):
+    """Get user avatar data (initials, color, avatar image)"""
+    if not email:
+        return {
+            'initials': 'U',
+            'avatar_color': '#666666',
+            'avatar': None
+        }
+    
+    try:
+        user_key = email.replace(".", ",")
+        user_data = firebase.ref.child("users").child(user_key).get()
+        
+        if user_data:
+            first_name = user_data.get('first_name', '').strip()
+            last_name = user_data.get('last_name', '').strip()
+            
+            # Generate initials
+            if first_name and last_name:
+                initials = (first_name[0] + last_name[0]).upper()
+            elif first_name:
+                initials = first_name[:2].upper()
+            elif last_name:
+                initials = last_name[:2].upper()
+            else:
+                initials = email[:2].upper()
+            
+            # Generate consistent background color based on email
+            colors = ['#FF5733', '#33A1FF', '#28A745', '#FFC300', '#8E44AD', '#FF69B4', '#20B2AA', '#FF4500']
+            color_index = sum(ord(c) for c in email) % len(colors)
+            
+            return {
+                'initials': initials,
+                'avatar_color': colors[color_index],
+                'avatar': user_data.get('profile_pic'),
+                'name': f"{first_name} {last_name}".strip() or email.split('@')[0].replace('.', ' ').title()
+            }
+    except Exception as e:
+        print(f"Error getting user avatar data for {email}: {e}")
+    
+    # Fallback
+    return {
+        'initials': email[:2].upper() if email else 'U',
+        'avatar_color': '#666666',
+        'avatar': None,
+        'name': email.split('@')[0].replace('.', ' ').title() if email else 'Unknown'
+    }
+
+def format_time(timestamp_str):
+    """Format timestamp for display"""
+    try:
+        if not timestamp_str:
+            return "Unknown"
+        
+        # Parse timestamp
+        if 'T' in timestamp_str:
+            # ISO format
+            dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        else:
+            # Legacy format
+            dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+        
+        now = datetime.now()
+        diff = now - dt.replace(tzinfo=None) if dt.tzinfo else now - dt
+        
+        if diff.days == 0:
+            if diff.seconds < 3600:  # Less than 1 hour
+                minutes = diff.seconds // 60
+                return f"{minutes}m ago" if minutes > 0 else "Just now"
+            else:
+                hours = diff.seconds // 3600
+                return f"{hours}h ago"
+        elif diff.days == 1:
+            return "Yesterday"
+        elif diff.days < 7:
+            return f"{diff.days}d ago"
+        else:
+            return dt.strftime('%b %d')
+            
+    except Exception as e:
+        print(f"Error formatting time {timestamp_str}: {e}")
+        return "Unknown"
+
+def enhance_email_data(mail, current_email):
+    """Enhance email data with avatar, name, and formatted time"""
+    try:
+        # Add formatted time
+        mail['formatted_time'] = format_time(mail.get('timestamp'))
+        
+        # Add message preview
+        message = mail.get('message', '')
+        mail['message_preview'] = message[:100] + '...' if len(message) > 100 else message
+        
+        # Handle inbox emails (received)
+        if mail.get('receiver') == current_email:
+            sender_email = mail.get('sender')
+            sender_data = get_user_avatar_data(sender_email)
+            
+            mail['sender_name'] = sender_data['name']
+            mail['sender_initials'] = sender_data['initials']
+            mail['sender_avatar_color'] = sender_data['avatar_color']
+            mail['sender_avatar'] = sender_data['avatar']
+        
+        # Handle sent emails
+        elif mail.get('sender') == current_email:
+            receiver_email = mail.get('receiver')
+            receiver_data = get_user_avatar_data(receiver_email)
+            
+            mail['receiver_name'] = receiver_data['name']
+            mail['receiver_initials'] = receiver_data['initials']
+            mail['receiver_avatar_color'] = receiver_data['avatar_color']
+            mail['receiver_avatar'] = receiver_data['avatar']
+        
+        # Handle drafts
+        else:
+            receiver_email = mail.get('receiver')
+            if receiver_email:
+                receiver_data = get_user_avatar_data(receiver_email)
+                mail['receiver_name'] = receiver_data['name']
+                mail['receiver_initials'] = receiver_data['initials']
+                mail['receiver_avatar_color'] = receiver_data['avatar_color']
+                mail['receiver_avatar'] = receiver_data['avatar']
+        
+    except Exception as e:
+        print(f"Error enhancing email data: {e}")
+    
+    return mail
+
 def generate_avatar(first_name, last_name, font_path="DejaVuSans-Bold.ttf"):
     import base64
     from io import BytesIO
@@ -314,6 +442,13 @@ def inbox():
         if m.get('receiver') == current_email:
             m['id'] = key
             messages.append(m)
+    
+    # Sort messages by timestamp (newest first)
+    try:
+        messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01 00:00:00')), reverse=True)
+    except:
+        # Fallback sorting if timestamp format is different
+        messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
     search_query = request.args.get("search", "").lower()
     if search_query:
@@ -323,7 +458,7 @@ def inbox():
             or search_query in m.get("message", "").lower()
         ]
 
-    # Categorize mails
+    # Categorize mails and enhance with avatar data
     categorized_mails = {
         "Inbox": [],
         "Promotions": [],
@@ -331,8 +466,10 @@ def inbox():
         "Updates": []
     }
     for mail in messages:
-        category = categorize_mail(mail.get("subject", ""), mail.get("message", ""))
-        categorized_mails[category].append(mail)
+        # Enhance email data with avatars, names, and formatted times
+        enhanced_mail = enhance_email_data(mail, current_email)
+        category = categorize_mail(enhanced_mail.get("subject", ""), enhanced_mail.get("message", ""))
+        categorized_mails[category].append(enhanced_mail)
 
     # Fetch Sent mails
     sent_messages_ref = firebase.ref.child("sent").child(user_key).get() or {}
@@ -340,11 +477,39 @@ def inbox():
     for key, m in sent_messages_ref.items():
         m['id'] = key
         sent_messages.append(m)
-    categorized_mails["Sent"] = sent_messages
+    
+    # Sort sent messages by timestamp (newest first) and enhance with avatar data
+    try:
+        sent_messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01 00:00:00')), reverse=True)
+    except:
+        sent_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    
+    # Enhance sent messages with avatar data
+    enhanced_sent_messages = []
+    for mail in sent_messages:
+        enhanced_mail = enhance_email_data(mail, current_email)
+        enhanced_sent_messages.append(enhanced_mail)
+    categorized_mails["Sent"] = enhanced_sent_messages
 
     # Fetch Draft mails
-    draft_messages = firebase.ref.child("drafts").child(user_key).get() or {}
-    categorized_mails["Drafts"] = list(draft_messages.values())
+    draft_messages_ref = firebase.ref.child("drafts").child(user_key).get() or {}
+    draft_messages = []
+    for key, m in draft_messages_ref.items():
+        m['id'] = key
+        draft_messages.append(m)
+    
+    # Sort draft messages by timestamp (newest first) and enhance with avatar data
+    try:
+        draft_messages.sort(key=lambda x: datetime.fromisoformat(x.get('timestamp', '1970-01-01 00:00:00')), reverse=True)
+    except:
+        draft_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    
+    # Enhance draft messages with avatar data
+    enhanced_draft_messages = []
+    for mail in draft_messages:
+        enhanced_mail = enhance_email_data(mail, current_email)
+        enhanced_draft_messages.append(enhanced_mail)
+    categorized_mails["Drafts"] = enhanced_draft_messages
 
     accounts = session.get('accounts', [])
     
@@ -1066,7 +1231,7 @@ def refresh_emails():
                 m['id'] = key
                 messages.append(m)
         
-        # Categorize mails
+        # Categorize mails and enhance with avatar data
         categorized_mails = {
             "Inbox": [],
             "Promotions": [],
@@ -1074,8 +1239,10 @@ def refresh_emails():
             "Updates": []
         }
         for mail in messages:
-            category = categorize_mail(mail.get("subject", ""), mail.get("message", ""))
-            categorized_mails[category].append(mail)
+            # Enhance email data with avatars, names, and formatted times
+            enhanced_mail = enhance_email_data(mail, current_email)
+            category = categorize_mail(enhanced_mail.get("subject", ""), enhanced_mail.get("message", ""))
+            categorized_mails[category].append(enhanced_mail)
         
         # Fetch Sent mails
         sent_messages_ref = firebase.ref.child("sent").child(user_key).get() or {}
@@ -1083,11 +1250,27 @@ def refresh_emails():
         for key, m in sent_messages_ref.items():
             m['id'] = key
             sent_messages.append(m)
-        categorized_mails["Sent"] = sent_messages
+        
+        # Enhance sent messages with avatar data
+        enhanced_sent_messages = []
+        for mail in sent_messages:
+            enhanced_mail = enhance_email_data(mail, current_email)
+            enhanced_sent_messages.append(enhanced_mail)
+        categorized_mails["Sent"] = enhanced_sent_messages
         
         # Fetch Draft mails
-        draft_messages = firebase.ref.child("drafts").child(user_key).get() or {}
-        categorized_mails["Drafts"] = list(draft_messages.values())
+        draft_messages_ref = firebase.ref.child("drafts").child(user_key).get() or {}
+        draft_messages = []
+        for key, m in draft_messages_ref.items():
+            m['id'] = key
+            draft_messages.append(m)
+        
+        # Enhance draft messages with avatar data
+        enhanced_draft_messages = []
+        for mail in draft_messages:
+            enhanced_mail = enhance_email_data(mail, current_email)
+            enhanced_draft_messages.append(enhanced_mail)
+        categorized_mails["Drafts"] = enhanced_draft_messages
         
         return jsonify({
             'success': True,
@@ -1109,6 +1292,45 @@ def debug_session():
         "accounts": session.get('accounts', []),
         "session_keys": list(session.keys())
     })
+
+# API endpoint to fetch all users for auto-complete
+@app.route("/api/users")
+def get_users():
+    current_email = session.get('user_email')
+    if not current_email:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Fetch all users from Firebase
+        users_ref = firebase.ref.child("users").get() or {}
+        users = []
+        
+        for email_key, user_data in users_ref.items():
+            if user_data:
+                # Convert Firebase key back to email
+                email = email_key.replace(",", ".")
+                
+                # Create user name from first and last name
+                first_name = user_data.get('first_name', '').strip()
+                last_name = user_data.get('last_name', '').strip()
+                name = f"{first_name} {last_name}".strip()
+                
+                # Fallback to email prefix if no name
+                if not name:
+                    name = email.split('@')[0].replace('.', ' ').title()
+                
+                users.append({
+                    'email': email,
+                    'name': name,
+                    'first_name': first_name,
+                    'last_name': last_name
+                })
+        
+        return jsonify(users)
+        
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        return jsonify({'error': 'Failed to fetch users'}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5001))

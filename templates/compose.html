@@ -128,6 +128,100 @@ textarea { min-height: 200px; resize: vertical; }
     word-wrap: break-word;
 }
 
+/* Auto-complete styles */
+.autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+.autocomplete-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: none;
+}
+
+.autocomplete-suggestion {
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background-color 0.2s;
+}
+
+.autocomplete-suggestion:hover {
+    background-color: #f5f5f5;
+}
+
+.autocomplete-suggestion.selected {
+    background-color: #e3f2fd;
+}
+
+.suggestion-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.suggestion-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.suggestion-name {
+    font-weight: 500;
+    font-size: 14px;
+    color: #202124;
+    margin-bottom: 2px;
+}
+
+.suggestion-email {
+    font-size: 12px;
+    color: #5f6368;
+}
+
+/* Dark mode for autocomplete */
+@media (prefers-color-scheme: dark) {
+    .autocomplete-suggestions {
+        background: #242526;
+        border-color: #3a3b3c;
+        color: #e8eaed;
+    }
+    
+    .autocomplete-suggestion:hover {
+        background-color: #3a3b3c;
+    }
+    
+    .autocomplete-suggestion.selected {
+        background-color: #174ea6;
+    }
+    
+    .suggestion-name {
+        color: #e8eaed;
+    }
+    
+    .suggestion-email {
+        color: #9aa0a6;
+    }
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     .compose-container { width: 95%; padding: 20px; }
@@ -141,7 +235,10 @@ textarea { min-height: 200px; resize: vertical; }
 <div class="compose-container">
     <a href="/inbox" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Back to Inbox</a>
     <form method="POST" enctype="multipart/form-data">
-        <input type="text" name="receiver" placeholder="To: user@example.com" value="{{ reply_data.reply_to or '' }}" required>
+        <div class="autocomplete-container">
+            <input type="text" name="receiver" id="receiverInput" placeholder="To: user@example.com" value="{{ reply_data.reply_to or '' }}" required>
+            <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
+        </div>
         <input type="text" name="subject" placeholder="Subject" value="{{ reply_data.subject or '' }}">
         <textarea name="message" placeholder="Compose your message..." required>{{ reply_data.message or '' }}</textarea>
 
@@ -164,6 +261,196 @@ textarea { min-height: 200px; resize: vertical; }
 <script>
 const fileInput = document.getElementById('fileAttach');
 const fileList = document.getElementById('fileList');
+const receiverInput = document.getElementById('receiverInput');
+const autocompleteSuggestions = document.getElementById('autocompleteSuggestions');
+
+// Auto-complete functionality
+let users = [];
+let selectedSuggestionIndex = -1;
+
+// Fetch users for auto-complete
+async function fetchUsers() {
+    try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+            users = await response.json();
+        }
+    } catch (error) {
+        console.error('Error fetching users:', error);
+    }
+}
+
+// Generate avatar for user
+function generateAvatar(name, email) {
+    const nameParts = name.split(' ');
+    let initials = '';
+    
+    if (nameParts.length >= 2) {
+        initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+    } else if (nameParts.length === 1) {
+        initials = nameParts[0].substring(0, 2).toUpperCase();
+    } else {
+        initials = email.substring(0, 2).toUpperCase();
+    }
+    
+    // Generate consistent background color based on email
+    const colors = ['#FF5733', '#33A1FF', '#28A745', '#FFC300', '#8E44AD', '#FF69B4', '#20B2AA', '#FF4500'];
+    const colorIndex = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+    
+    return {
+        initials: initials,
+        backgroundColor: colors[colorIndex]
+    };
+}
+
+// Show auto-complete suggestions
+function showSuggestions(query) {
+    if (!query || !query.includes('@')) {
+        autocompleteSuggestions.style.display = 'none';
+        return;
+    }
+    
+    const atIndex = query.lastIndexOf('@');
+    const beforeAt = query.substring(0, atIndex);
+    const afterAt = query.substring(atIndex + 1);
+    
+    // If @ is typed, auto-complete with bharatmail.in
+    if (afterAt === '') {
+        const suggestions = users.filter(user => 
+            user.email.startsWith(beforeAt + '@bharatmail.in') ||
+            user.name.toLowerCase().includes(beforeAt.toLowerCase())
+        ).slice(0, 5);
+        
+        displaySuggestions(suggestions, beforeAt + '@bharatmail.in');
+        return;
+    }
+    
+    // Filter users based on query
+    const suggestions = users.filter(user => 
+        user.email.toLowerCase().includes(query.toLowerCase()) ||
+        user.name.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 5);
+    
+    displaySuggestions(suggestions, query);
+}
+
+// Display suggestions in the dropdown
+function displaySuggestions(suggestions, query) {
+    if (suggestions.length === 0) {
+        autocompleteSuggestions.style.display = 'none';
+        return;
+    }
+    
+    autocompleteSuggestions.innerHTML = '';
+    
+    suggestions.forEach((user, index) => {
+        const avatar = generateAvatar(user.name, user.email);
+        const suggestionDiv = document.createElement('div');
+        suggestionDiv.className = 'autocomplete-suggestion';
+        suggestionDiv.setAttribute('data-index', index);
+        suggestionDiv.setAttribute('data-email', user.email);
+        
+        suggestionDiv.innerHTML = `
+            <div class="suggestion-avatar" style="background-color: ${avatar.backgroundColor}">
+                ${avatar.initials}
+            </div>
+            <div class="suggestion-info">
+                <div class="suggestion-name">${user.name}</div>
+                <div class="suggestion-email">${user.email}</div>
+            </div>
+        `;
+        
+        suggestionDiv.addEventListener('click', () => {
+            selectSuggestion(user.email);
+        });
+        
+        suggestionDiv.addEventListener('mouseenter', () => {
+            selectedSuggestionIndex = index;
+            updateSelectedSuggestion();
+        });
+        
+        autocompleteSuggestions.appendChild(suggestionDiv);
+    });
+    
+    autocompleteSuggestions.style.display = 'block';
+    selectedSuggestionIndex = -1;
+}
+
+// Update selected suggestion styling
+function updateSelectedSuggestion() {
+    const suggestions = autocompleteSuggestions.querySelectorAll('.autocomplete-suggestion');
+    suggestions.forEach((suggestion, index) => {
+        if (index === selectedSuggestionIndex) {
+            suggestion.classList.add('selected');
+        } else {
+            suggestion.classList.remove('selected');
+        }
+    });
+}
+
+// Select a suggestion
+function selectSuggestion(email) {
+    receiverInput.value = email;
+    autocompleteSuggestions.style.display = 'none';
+    receiverInput.focus();
+}
+
+// Handle keyboard navigation
+function handleKeydown(event) {
+    const suggestions = autocompleteSuggestions.querySelectorAll('.autocomplete-suggestion');
+    
+    if (suggestions.length === 0) return;
+    
+    switch (event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, suggestions.length - 1);
+            updateSelectedSuggestion();
+            break;
+            
+        case 'ArrowUp':
+            event.preventDefault();
+            selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1);
+            updateSelectedSuggestion();
+            break;
+            
+        case 'Enter':
+            event.preventDefault();
+            if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+                const email = suggestions[selectedSuggestionIndex].getAttribute('data-email');
+                selectSuggestion(email);
+            }
+            break;
+            
+        case 'Escape':
+            autocompleteSuggestions.style.display = 'none';
+            selectedSuggestionIndex = -1;
+            break;
+    }
+}
+
+// Event listeners
+receiverInput.addEventListener('input', (e) => {
+    showSuggestions(e.target.value);
+});
+
+receiverInput.addEventListener('keydown', handleKeydown);
+
+receiverInput.addEventListener('focus', () => {
+    if (receiverInput.value) {
+        showSuggestions(receiverInput.value);
+    }
+});
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', (e) => {
+    if (!receiverInput.contains(e.target) && !autocompleteSuggestions.contains(e.target)) {
+        autocompleteSuggestions.style.display = 'none';
+        selectedSuggestionIndex = -1;
+    }
+});
+
+// File attachment handling
 fileInput.addEventListener('change', function() {
     fileList.innerHTML = '';
     for (let i=0; i<this.files.length; i++) {
@@ -171,6 +458,11 @@ fileInput.addEventListener('change', function() {
         fileDiv.textContent = this.files[i].name;
         fileList.appendChild(fileDiv);
     }
+});
+
+// Initialize auto-complete
+document.addEventListener('DOMContentLoaded', function() {
+    fetchUsers();
 });
 </script>
 
