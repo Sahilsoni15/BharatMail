@@ -296,9 +296,9 @@
                         Attachments ({{ mail.attachments|length }})
                     </h4>
                     {% for file in mail.attachments %}
-                    <a href="{{ file }}" class="attachment-item" target="_blank" rel="noopener noreferrer">
+                    <a href="/uploads/{{ file }}" class="attachment-item" target="_blank" rel="noopener noreferrer">
                         <i class="fa-solid fa-file attachment-icon"></i>
-                        <span class="attachment-name">{{ file.split('/')[-1] }}</span>
+                        <span class="attachment-name">{{ file }}</span>
                         <i class="fa-solid fa-external-link" style="margin-left: auto; opacity: 0.6;"></i>
                     </a>
                     {% endfor %}

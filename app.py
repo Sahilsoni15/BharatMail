@@ -1,20 +1,87 @@
-from flask import Flask, render_template, request, redirect, session, flash, jsonify
-from datetime import datetime
+from flask import Flask, render_template, request, redirect, session, flash, jsonify, send_from_directory
+from datetime import datetime, timedelta
 import firebase
 import re
 import random
 import os
 from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
+import time
+import secrets
+from functools import wraps
 app = Flask(__name__)
-from datetime import timedelta
-app.permanent_session_lifetime = timedelta(days=30)
+app.permanent_session_lifetime = timedelta(hours=8)  # Session expires after 8 hours
+
+# Configure session security
+app.config.update(
+    SESSION_COOKIE_SECURE=True if os.environ.get('HTTPS') == 'true' else False,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8)
+)
 
 @app.before_request
 def make_session_permanent():
     session.permanent = True
+    
+    # Check for session timeout
+    if 'last_activity' in session:
+        last_activity = datetime.fromisoformat(session['last_activity'])
+        if datetime.now() - last_activity > timedelta(hours=8):
+            session.clear()
+            flash('Session expired. Please log in again.')
+            return redirect('/login')
+    
+    # Update last activity timestamp
+    session['last_activity'] = datetime.now().isoformat()
 
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
+
+# Rate limiting storage
+request_counts = {}
+CSRF_SECRET_KEY = os.environ.get('CSRF_SECRET_KEY', secrets.token_urlsafe(32))
+
+# Rate limiting decorator
+def rate_limit(max_requests=10, per_seconds=60):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user_id = session.get('user_email', request.remote_addr)
+            current_time = time.time()
+            
+            # Clean old entries
+            if user_id in request_counts:
+                request_counts[user_id] = [
+                    timestamp for timestamp in request_counts[user_id]
+                    if current_time - timestamp < per_seconds
+                ]
+            else:
+                request_counts[user_id] = []
+            
+            # Check rate limit
+            if len(request_counts[user_id]) >= max_requests:
+                return jsonify({'error': 'Rate limit exceeded. Please wait a moment.'}), 429
+            
+            # Add current request
+            request_counts[user_id].append(current_time)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# CSRF token generation
+def generate_csrf_token():
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_urlsafe(32)
+    return session['csrf_token']
+
+# CSRF validation
+def validate_csrf_token(token):
+    return token and 'csrf_token' in session and secrets.compare_digest(session['csrf_token'], token)
+
+# Template context processor
+@app.context_processor
+def inject_csrf_token():
+    return dict(csrf_token=generate_csrf_token)
 
 # Updated domain from @bharatmail.free.nf to @bharatmail.in for custom domain
 EMAIL_SUFFIX = "@bharatmail.in"
@@ -391,8 +458,14 @@ def compose():
 
         # Sending mail
         sender = current_email
-        receiver_username = request.form['receiver'].strip().lower()
-        receiver = f"{receiver_username}{EMAIL_SUFFIX}"
+        receiver_input = request.form['receiver'].strip().lower() if 'receiver' in request.form else request.form['to'].strip().lower()
+        
+        # Handle full email addresses or just usernames
+        if "@" in receiver_input:
+            receiver = receiver_input
+        else:
+            receiver = f"{receiver_input}{EMAIL_SUFFIX}"
+            
         subject = request.form['subject']
         message = request.form['message']
         timestamp = str(datetime.now())
@@ -401,19 +474,23 @@ def compose():
             flash(f"Receiver {receiver} does not exist!")
             return redirect("/compose")
 
-        # Save attachments
+        # Save attachments to uploads folder
         attachments = []
+        upload_folder = "uploads"
+        os.makedirs(upload_folder, exist_ok=True)
+        
         if 'attachments' in request.files:
-            # Upload folder exist नहीं तो create कर दो
-            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
             files = request.files.getlist('attachments')
             for file in files:
-                if file.filename:
+                if file and file.filename:
                     filename = secure_filename(file.filename)
-                    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    # Add timestamp to prevent conflicts
+                    timestamp_str = str(int(datetime.now().timestamp()))
+                    name, ext = os.path.splitext(filename)
+                    unique_filename = f"{name}_{timestamp_str}{ext}"
+                    filepath = os.path.join(upload_folder, unique_filename)
                     file.save(filepath)
-                    attachments.append(f"/{filepath}")
+                    attachments.append(unique_filename)  # Store unique filename
 
         # Create mail data
         mail_data = {
@@ -422,16 +499,29 @@ def compose():
             "subject": subject,
             "message": message,
             "attachments": attachments,
-            "timestamp": timestamp
+            "timestamp": timestamp,
+            "is_reply": bool(reply_to),  # Track if this is a reply
+            "cc": request.form.get('cc', ''),  # Include CC if provided
+            "bcc": request.form.get('bcc', '')  # Include BCC if provided
         }
+        
+        print(f"\n=== SENDING MAIL ===")
+        print(f"From: {sender}")
+        print(f"To: {receiver}")
+        print(f"Subject: {subject}")
+        print(f"Attachments: {attachments}")
+        print(f"Is Reply: {bool(reply_to)}")
         
         # Save in receiver's inbox
         receiver_key = receiver.replace(".", ",")
-        firebase.ref.child("inbox").child(receiver_key).push(mail_data)
+        inbox_ref = firebase.ref.child("inbox").child(receiver_key).push(mail_data)
+        print(f"Saved to receiver inbox: {inbox_ref.key}")
         
         # Save in sender's sent folder
         sender_key = sender.replace(".", ",")
-        firebase.ref.child("sent").child(sender_key).push(mail_data)
+        sent_ref = firebase.ref.child("sent").child(sender_key).push(mail_data)
+        print(f"Saved to sender sent: {sent_ref.key}")
+        print(f"=== END SENDING MAIL ===")
         flash("Message sent successfully!")
         return redirect("/inbox")
 
@@ -697,15 +787,20 @@ def send_mail():
     attachments = request.files.getlist('attachments')
     saved_attachments = []
 
-    # <-- Add this line to create uploads folder if missing
-    os.makedirs("./uploads", exist_ok=True)
+    # Create uploads folder if missing
+    upload_folder = "uploads"
+    os.makedirs(upload_folder, exist_ok=True)
 
     for file in attachments:
-        if file.filename:
+        if file and file.filename:
             filename = secure_filename(file.filename)
-            filepath = os.path.join("./uploads", filename)
+            # Add timestamp to prevent conflicts
+            timestamp_str = str(int(datetime.now().timestamp()))
+            name, ext = os.path.splitext(filename)
+            unique_filename = f"{name}_{timestamp_str}{ext}"
+            filepath = os.path.join(upload_folder, unique_filename)
             file.save(filepath)
-            saved_attachments.append(f"/{filepath}")
+            saved_attachments.append(unique_filename)  # Store just filename
 
     # Create mail data
     mail_data = {
@@ -753,6 +848,76 @@ def read_mail(mail_id):
         return redirect("/inbox")
 
     return render_template("read_mail.html", mail=mail)
+
+# Route to serve uploaded attachments
+@app.route("/uploads/<filename>")
+def uploaded_file(filename):
+    """Serve uploaded attachment files"""
+    upload_folder = "uploads"
+    file_path = os.path.join(upload_folder, filename)
+    if not os.path.exists(file_path):
+        # Return 404 error for missing files
+        from flask import abort
+        abort(404)
+    return send_from_directory(upload_folder, filename)
+
+# Secure refresh API endpoint
+@app.route("/api/refresh", methods=["POST"])
+@rate_limit(max_requests=15, per_seconds=60)  # Allow 15 refreshes per minute
+def refresh_emails():
+    current_email = session.get('user_email')
+    if not current_email:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Validate CSRF token
+    csrf_token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not validate_csrf_token(csrf_token):
+        return jsonify({'error': 'Invalid CSRF token'}), 403
+    
+    try:
+        user_key = current_email.replace(".", ",")
+        
+        # Fetch received messages from the user's inbox
+        inbox_ref = firebase.ref.child("inbox").child(user_key).get() or {}
+        messages = []
+        for key, m in inbox_ref.items():
+            if m.get('receiver') == current_email:
+                m['id'] = key
+                messages.append(m)
+        
+        # Categorize mails
+        categorized_mails = {
+            "Inbox": [],
+            "Promotions": [],
+            "Social": [],
+            "Updates": []
+        }
+        for mail in messages:
+            category = categorize_mail(mail.get("subject", ""), mail.get("message", ""))
+            categorized_mails[category].append(mail)
+        
+        # Fetch Sent mails
+        sent_messages_ref = firebase.ref.child("sent").child(user_key).get() or {}
+        sent_messages = []
+        for key, m in sent_messages_ref.items():
+            m['id'] = key
+            sent_messages.append(m)
+        categorized_mails["Sent"] = sent_messages
+        
+        # Fetch Draft mails
+        draft_messages = firebase.ref.child("drafts").child(user_key).get() or {}
+        categorized_mails["Drafts"] = list(draft_messages.values())
+        
+        return jsonify({
+            'success': True,
+            'categorized_mails': categorized_mails,
+            'timestamp': str(datetime.now()),
+            'total_messages': len(messages)
+        })
+        
+    except Exception as e:
+        print(f"Error refreshing emails: {e}")
+        return jsonify({'error': 'Failed to refresh emails'}), 500
 
 # Debug route to check session
 @app.route("/debug/session")
