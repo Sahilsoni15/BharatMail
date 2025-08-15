@@ -224,6 +224,23 @@
     @media (max-width: 480px) {
         .left-side, .right-side { padding: 15px; }
         body { padding: 5px; }
+        
+        /* Stack email field vertically on very small screens */
+        .email-container {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+        }
+        
+        .email-container input {
+            width: 100% !important;
+            margin-bottom: 8px !important;
+        }
+        
+        .email-container span {
+            margin-left: 0 !important;
+            font-size: 12px;
+            opacity: 0.8;
+        }
     }
 </style>
 </head>
@@ -257,7 +274,7 @@
             <input type="file" name="profile_pic" id="profilePic" accept="image/*" style="display:none">
             <input type="text" id="first_name" name="first_name" required placeholder="First name" oninput="updateAvatar()">
             <input type="text" id="last_name" name="last_name" required placeholder="Last name" oninput="updateAvatar()">
-            <div style="display: flex; align-items: center; margin-bottom: 15px; box-sizing: border-box; width: 100%;">
+            <div class="email-container" style="display: flex; align-items: center; margin-bottom: 15px; box-sizing: border-box; width: 100%;">
                 <input type="text" id="email" name="email" required placeholder="Choose username" style="flex: 1; min-width: 0; box-sizing: border-box;">
                 <span style="margin-left: 5px; color: #bdc1c6; white-space: nowrap; flex-shrink: 0;">@bharatmail.in</span>
             </div>
