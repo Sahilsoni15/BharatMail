@@ -17,7 +17,7 @@ def make_session_permanent():
 
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 
-EMAIL_SUFFIX = "@bharatmail.free.nf"
+EMAIL_SUFFIX = "@bharatmail.in"
 UPLOAD_FOLDER = "static/profile_pics"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -596,6 +596,6 @@ def read_mail(mail_id):
     return render_template("read_mail.html", mail=mail)
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5001))
     debug = os.environ.get('FLASK_ENV', 'production') == 'development'
     app.run(host='0.0.0.0', port=port, debug=debug)
