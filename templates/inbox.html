@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BharatMail - Inbox</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+    :root { --accent: #1a73e8; }
+
+    @media (prefers-color-scheme: dark) {
+        body { background-color: #202124; color: #e8eaed; }
+        .sidebar { background-color: #2d2e30; border-right: 1px solid #3c4043; }
+        .email-item:hover { background-color: #3c4043; }
+        .dropdown { background-color: #2d2e30; color: white; border: 1px solid #3c4043; }
+        .dropdown-item:hover { background-color: #3c4043; }
+        #mailSearch { background-color: #3c4043; color: white; border: 1px solid #5f6368; }
+    }
+
+    @media (prefers-color-scheme: light) {
+        body { background-color: #ffffff; color: #000000; }
+        .sidebar { background-color: #f1f3f4; border-right: 1px solid #dadce0; }
+        .email-item:hover { background-color: #f1f3f4; }
+        .dropdown { background-color: white; color: black; border: 1px solid #dadce0; }
+        .dropdown-item:hover { background-color: #f1f3f4; }
+        #mailSearch { background-color: white; color: black; border: 1px solid #ccc; }
+    }
+
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        display: flex;
+        height: 100vh;
+    }
+
+    .sidebar {
+        width: 250px;
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        transition: transform 0.3s ease;
+        background-color: inherit;
+        z-index: 300;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        overflow-y: auto;
+        transform: translateX(0);
+    }
+
+    .sidebar.hidden {
+        transform: translateX(-100%);
+    }
+
+    .logo {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+        font-size: 18px;
+        font-weight: bold;
+    }
+
+    .logo img {
+        height: 40px;
+        width: 40px;
+        border-radius: 50%;
+        margin-right: 8px;
+        object-fit: cover;
+    }
+
+    .compose-btn {
+        background-color: var(--accent);
+        color: white;
+        padding: 12px;
+        border: none;
+        border-radius: 20px;
+        margin-bottom: 20px;
+        cursor: pointer;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .menu-item {
+        padding: 10px;
+        cursor: pointer;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .menu-item:hover {
+        background-color: rgba(26, 115, 232, 0.1);
+    }
+
+    .top-bar {
+        position: fixed;
+        top: 0;
+        left: 250px;
+        right: 0;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 0 20px;
+        border-bottom: 1px solid rgba(128,128,128,0.2);
+        z-index: 100;
+        background: inherit;
+        transition: left 0.3s ease;
+    }
+
+    .profile-pic, .profile-initials {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        object-fit: cover;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 700;
+        color: white;
+        text-transform: uppercase;
+        border: 2px solid rgba(255,255,255,0.1);
+        transition: all 0.2s ease;
+        overflow: hidden;
+        letter-spacing: 0px;
+        line-height: 1;
+    }
+    
+    .profile-pic:hover, .profile-initials:hover {
+        transform: scale(1.05);
+        border-color: rgba(255,255,255,0.2);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .dropdown {
+        position: absolute;
+        top: 60px;
+        right: 20px;
+        width: 280px;
+        border-radius: 8px;
+        display: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 200;
+    }
+
+    .dropdown-header {
+        padding: 15px;
+        border-bottom: 1px solid rgba(128,128,128,0.2);
+        text-align: center;
+    }
+
+    .dropdown-header img, .dropdown-header .profile-initials {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        margin: 0 auto 12px auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: 700;
+        color: white;
+        border: 3px solid rgba(255,255,255,0.1);
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        line-height: 1;
+        letter-spacing: 0.5px;
+    }
+
+    .dropdown-item {
+        padding: 12px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+    }
+
+    .dropdown-item .remove-btn {
+        background: none;
+        border: none;
+        color: red;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .email-section {
+        margin-top: 50px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        margin-left: 250px;
+        transition: margin-left 0.3s ease;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+    /* Floating Compose Button */
+    .compose-float-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 12px 20px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    /* Top bar utility buttons */
+    .top-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        color: var(--accent);
+        margin-left: 10px;
+    }
+
+    @media (max-width: 768px) {
+        .top-btn { display: none; }
+    }
+
+    .email-search {
+        padding: 10px;
+        border-bottom: 1px solid rgba(128,128,128,0.2);
+    }
+
+    #mailSearch {
+        width: 100%;
+        padding: 8px;
+        border-radius: 6px;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    .email-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .email-item {
+        padding: 12px;
+        border-bottom: 1px solid rgba(128,128,128,0.2);
+        cursor: pointer;
+    }
+
+    .email-item strong {
+        display: block;
+    }
+
+    /* Sidebar toggle for all screens */
+    .menu-toggle-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        font-size: 22px;
+        cursor: pointer;
+        color: var(--accent);
+        background: transparent;
+        border: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .sidebar {
+            /* Removed transform from here to avoid conflict */
+        }
+        .email-section {
+            margin-left: 0;
+        }
+        .top-bar {
+            left: 0 !important;
+        }
+    }
+
+    /* Compose Panel Styles */
+    .compose-panel {
+        position: fixed;
+        top: 50px;
+        right: 0;
+        width: 400px;
+        height: calc(100vh - 50px);
+        background-color: inherit;
+        border-left: 1px solid rgba(128,128,128,0.2);
+        box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        padding: 15px;
+        box-sizing: border-box;
+        display: none;
+        flex-direction: column;
+        z-index: 400;
+        overflow-y: auto;
+    }
+
+    .compose-panel header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .compose-panel header h2 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .compose-panel header button.close-btn {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: var(--accent);
+    }
+
+    .compose-panel .compose-brand {
+        text-align: center;
+        font-weight: bold;
+        font-size: 20px;
+        margin-bottom: 10px;
+        letter-spacing: 1px;
+        color: var(--accent);
+    }
+
+    .compose-panel form {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    .compose-panel label {
+        font-weight: bold;
+        margin-top: 10px;
+        margin-bottom: 4px;
+        font-size: 14px;
+    }
+
+    .compose-panel input[type="text"],
+    .compose-panel input[type="email"],
+    .compose-panel textarea {
+        width: 100%;
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        font-size: 14px;
+        box-sizing: border-box;
+        background-color: inherit;
+        color: inherit;
+        resize: vertical;
+    }
+
+    .compose-panel textarea {
+        min-height: 120px;
+    }
+
+    .compose-panel input[type="file"] {
+        margin-top: 8px;
+    }
+
+    .compose-panel button.send-btn {
+        margin-top: 15px;
+        background-color: var(--accent);
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 20px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 16px;
+        align-self: flex-end;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .compose-panel .attachment-preview {
+        margin-top: 8px;
+        margin-bottom: 8px;
+    }
+    .compose-panel .attachment-preview div {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(26,115,232,0.08);
+        border-radius: 12px;
+        padding: 4px 10px;
+        margin-right: 6px;
+        margin-bottom: 4px;
+        font-size: 13px;
+    }
+    .compose-panel .attachment-preview button {
+        background: none;
+        border: none;
+        color: #e53935;
+        margin-left: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="logo">
+            <img src="/static/logo.png" alt="BharatMail Logo">
+            BharatMail
+        </div>
+        <button class="compose-btn" onclick="openCompose()">
+            <i class="fa-solid fa-pencil"></i> Compose
+        </button>
+        <div class="menu-item" onclick="filterCategory('All')" data-category="All">All Mail</div>
+        <div class="menu-item" onclick="filterCategory('Inbox')" data-category="Inbox">Inbox</div>
+        <div class="menu-item" onclick="filterCategory('Promotions')" data-category="Promotions">Promotions</div>
+        <div class="menu-item" onclick="filterCategory('Social')" data-category="Social">Social</div>
+        <div class="menu-item" onclick="filterCategory('Updates')" data-category="Updates">Updates</div>
+        <div class="menu-item" onclick="filterCategory('Sent')" data-category="Sent">Sent</div>
+        <div class="menu-item" onclick="filterCategory('Drafts')" data-category="Drafts">Drafts</div>
+    </div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <button class="menu-toggle-btn" aria-label="Toggle Menu" onclick="toggleSidebar()">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <button class="top-btn" onclick="refreshMails()"><i class="fa-solid fa-arrows-rotate"></i></button>
+        <button class="top-btn" onclick="selectAllMails()"><i class="fa-solid fa-check"></i></button>
+        <div style="flex:1"></div>
+        {% if user_profile_pic %}
+            <img src="{{ user_profile_pic }}" alt="Profile" class="profile-pic" onclick="toggleDropdown()">
+        {% else %}
+            {% set name_parts = user_name.split() %}
+            {% if name_parts|length >= 2 %}
+                {% set initials = (name_parts[0][0] ~ name_parts[-1][0])|upper %}
+            {% elif name_parts|length == 1 %}
+                {% set initials = name_parts[0][0:2]|upper %}
+            {% else %}
+                {% set initials = user_email[0]|upper %}
+            {% endif %}
+            <div class="profile-initials" style="background-color: {{ profile_bg_color }};" onclick="toggleDropdown()">
+                {{ initials }}
+            </div>
+        {% endif %}
+        <div class="dropdown" id="profileDropdown">
+            <!-- Current User -->
+            <div class="dropdown-header">
+                {% if user_profile_pic %}
+                    <img src="{{ user_profile_pic }}" alt="Profile">
+                {% else %}
+                    <div class="profile-initials" style="background-color: {{ profile_bg_color }};">
+                        {{ initials }}
+                    </div>
+                {% endif %}
+                <strong>{{ user_name }}</strong>
+                <small>{{ user_email }}</small>
+            </div>
+
+            <!-- Other Accounts -->
+            {% for acc in other_accounts %}
+            <div class="dropdown-item">
+                <span onclick="window.location.href='/switch_account/{{ acc.email }}'" style="flex:1;cursor:pointer;">
+                    {{ acc.name }}<br><small>{{ acc.email }}</small>
+                </span>
+                <i class="fa-solid fa-right-from-bracket" title="Logout" style="color:red;cursor:pointer;margin-left:10px;"
+                   onclick="window.location.href='/logout/{{ acc.email }}'"></i>
+            </div>
+            {% endfor %}
+
+            <div class="dropdown-item" onclick="window.location.href='/login?add=1'">
+                <i class="fa-solid fa-plus"></i> Add account
+            </div>
+            <div class="dropdown-item" onclick="window.location.href='/manage_profile'">
+                <i class="fa-solid fa-user-gear"></i> Manage Profile
+            </div>
+            <div class="dropdown-item" onclick="window.location.href='/logout'">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </div>
+        </div>
+    </div>
+
+    <!-- Compose Panel -->
+    <div class="compose-panel" id="composePanel">
+        <div class="compose-brand">BharatMail</div>
+        <header>
+            <h2>New Message</h2>
+            <button class="close-btn" aria-label="Close Compose" onclick="closeCompose()">&times;</button>
+        </header>
+        <form id="composeForm" action="/send_mail" method="post" enctype="multipart/form-data">
+            <label for="fromEmail">From</label>
+            <input type="email" id="fromEmail" name="from" value="{{ user_email }}" readonly>
+
+            <label for="toEmail">To</label>
+            <input type="email" id="toEmail" name="to" placeholder="Recipient email" required>
+
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom:4px;">
+                <button type="button" onclick="toggleCC()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:0;">CC</button>
+                <button type="button" onclick="toggleBCC()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:0;">BCC</button>
+            </div>
+            <div id="ccRow" style="display:none;">
+                <label for="ccEmail" style="margin-top:0;">CC</label>
+                <input type="email" id="ccEmail" name="cc" placeholder="CC email(s)">
+            </div>
+            <div id="bccRow" style="display:none;">
+                <label for="bccEmail" style="margin-top:0;">BCC</label>
+                <input type="email" id="bccEmail" name="bcc" placeholder="BCC email(s)">
+            </div>
+
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" placeholder="Subject">
+
+            <label for="messageBody">Message</label>
+            <textarea id="messageBody" name="message" placeholder="Write your message here..."></textarea>
+
+            <label for="attachments">Attachments</label>
+            <input type="file" id="attachments" name="attachments" multiple>
+            <div class="attachment-preview" id="attachmentList"></div>
+
+            <button type="submit" class="send-btn"><i class="fa-solid fa-paper-plane"></i> Send</button>
+        </form>
+    </div>
+
+    <!-- Email Section -->
+    <div class="email-section">
+        <!-- Mail Search -->
+        <div class="email-search">
+            <input type="text" id="mailSearch" placeholder="Search mails...">
+        </div>
+
+        <!-- Email List -->
+        <div class="email-list" id="mailList">
+            <!-- Inbox Messages -->
+            {% for m in categorized_mails['Inbox'] %}
+            <div class="email-item" data-id="{{ m.id }}" data-category="Inbox">
+                <strong>{{ m.sender }}</strong>
+                <span>{{ m.subject }}</span>
+            </div>
+            {% endfor %}
+            
+            <!-- Promotions Messages -->
+            {% for m in categorized_mails['Promotions'] %}
+            <div class="email-item" data-id="{{ m.id }}" data-category="Promotions">
+                <strong>{{ m.sender }}</strong>
+                <span>{{ m.subject }}</span>
+            </div>
+            {% endfor %}
+            
+            <!-- Social Messages -->
+            {% for m in categorized_mails['Social'] %}
+            <div class="email-item" data-id="{{ m.id }}" data-category="Social">
+                <strong>{{ m.sender }}</strong>
+                <span>{{ m.subject }}</span>
+            </div>
+            {% endfor %}
+            
+            <!-- Updates Messages -->
+            {% for m in categorized_mails['Updates'] %}
+            <div class="email-item" data-id="{{ m.id }}" data-category="Updates">
+                <strong>{{ m.sender }}</strong>
+                <span>{{ m.subject }}</span>
+            </div>
+            {% endfor %}
+            
+            <!-- Sent Messages -->
+            {% for m in categorized_mails['Sent'] %}
+            <div class="email-item" data-id="{{ m.id }}" data-category="Sent">
+                <strong>To: {{ m.receiver }}</strong>
+                <span>{{ m.subject }}</span>
+            </div>
+            {% endfor %}
+            
+            <!-- Draft Messages -->
+            {% for m in categorized_mails['Drafts'] %}
+            <div class="email-item" data-id="{{ m.id }}" data-category="Drafts">
+                <strong>Draft to: {{ m.receiver or 'No recipient' }}</strong>
+                <span>{{ m.subject or '(No subject)' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+<script>
+function toggleDropdown() {
+    const menu = document.getElementById('profileDropdown');
+    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('profileDropdown');
+    if (!e.target.closest('.profile-pic') && !e.target.closest('.profile-initials') && !e.target.closest('.dropdown')) {
+        menu.style.display = 'none';
+    }
+});
+
+function removeAccount(id) {
+    window.location.href = '/switch_account/' + id;
+}
+
+// Step 3: JS function to filter emails
+function filterCategory(category) {
+    document.querySelectorAll('.email-item').forEach(item => {
+        if(category === 'All' || item.dataset.category === category) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    updateDeleteButtonVisibility();
+}
+
+// Mail search functionality
+document.getElementById('mailSearch').addEventListener('input', function() {
+    const filter = this.value.toLowerCase();
+    document.querySelectorAll('#mailList .email-item').forEach(function(item) {
+        const text = item.innerText.toLowerCase();
+        item.style.display = text.includes(filter) ? '' : 'none';
+    });
+    updateDeleteButtonVisibility();
+});
+
+// Sidebar toggle for all screens
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('hidden');
+    const topBar = document.querySelector('.top-bar');
+    if (sidebar.classList.contains('hidden')) {
+        topBar.style.left = '0';
+        document.querySelector('.email-section').style.marginLeft = '0';
+    } else {
+        topBar.style.left = '250px';
+        document.querySelector('.email-section').style.marginLeft = '250px';
+    }
+}
+
+// Initialize sidebar as visible on desktop
+window.addEventListener('load', function() {
+    if (window.innerWidth > 1024) {
+        document.getElementById('sidebar').classList.remove('hidden');
+        document.querySelector('.top-bar').style.left = '250px';
+        document.querySelector('.email-section').style.marginLeft = '250px';
+    } else {
+        document.getElementById('sidebar').classList.add('hidden');
+        document.querySelector('.top-bar').style.left = '0';
+        document.querySelector('.email-section').style.marginLeft = '0';
+    }
+});
+
+// Close sidebar when clicking outside on mobile
+document.addEventListener('click', function(e) {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.querySelector('.menu-toggle-btn');
+    if (window.innerWidth <= 1024) {
+        if (!sidebar.contains(e.target) && !toggleBtn.contains(e.target)) {
+            sidebar.classList.add('hidden');
+            const topBar = document.querySelector('.top-bar');
+            topBar.style.left = '0';
+            document.querySelector('.email-section').style.marginLeft = '0';
+        }
+    }
+});
+
+// Compose panel control
+function openCompose() {
+    document.getElementById('composePanel').style.display = 'flex';
+}
+
+function closeCompose() {
+    document.getElementById('composePanel').style.display = 'none';
+}
+
+// Compose attachment preview and removal
+document.addEventListener('DOMContentLoaded', function() {
+    var attachInput = document.getElementById('attachments');
+    var attachList = document.getElementById('attachmentList');
+    if (attachInput && attachList) {
+        attachInput.addEventListener('change', function(){
+            attachList.innerHTML = '';
+            Array.from(this.files).forEach((file, index) => {
+                const div = document.createElement('div');
+                div.textContent = file.name;
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = 'x';
+                removeBtn.type = 'button';
+                removeBtn.onclick = () => {
+                    const dt = new DataTransfer();
+                    Array.from(attachInput.files).forEach((f,i) => { if(i!==index) dt.items.add(f) });
+                    attachInput.files = dt.files;
+                    // re-trigger change to update
+                    const event = new Event('change', {bubbles:true});
+                    attachInput.dispatchEvent(event);
+                };
+                div.appendChild(removeBtn);
+                attachList.appendChild(div);
+            });
+        });
+    }
+});
+
+// CC/BCC toggle
+function toggleCC() {
+    var ccRow = document.getElementById('ccRow');
+    if (ccRow) ccRow.style.display = ccRow.style.display === 'none' ? 'block' : 'none';
+}
+function toggleBCC() {
+    var bccRow = document.getElementById('bccRow');
+    if (bccRow) bccRow.style.display = bccRow.style.display === 'none' ? 'block' : 'none';
+}
+// Hide CC/BCC initially
+document.addEventListener('DOMContentLoaded', function() {
+    var ccRow = document.getElementById('ccRow');
+    var bccRow = document.getElementById('bccRow');
+    if(ccRow) ccRow.style.display = 'none';
+    if(bccRow) bccRow.style.display = 'none';
+});
+
+function refreshMails(){ console.log('Refresh mails'); }
+
+// --- Email Selection and Delete Button Logic ---
+const selectedEmailIds = new Set();
+let longPressTimer = null;
+
+function updateDeleteButtonVisibility() {
+    const deleteBtn = document.getElementById('deleteSelectedBtn');
+    if (!deleteBtn) return;
+    // Only show if any selected email is visible
+    let anyVisibleSelected = false;
+    document.querySelectorAll('.email-item').forEach(item => {
+        if (item.style.display !== 'none' && selectedEmailIds.has(item.dataset.id)) {
+            anyVisibleSelected = true;
+        }
+    });
+    deleteBtn.style.display = anyVisibleSelected ? 'flex' : 'none';
+}
+
+function clearSelections() {
+    selectedEmailIds.clear();
+    document.querySelectorAll('.email-item.selected').forEach(item => {
+        item.classList.remove('selected');
+    });
+    updateDeleteButtonVisibility();
+}
+
+function handleEmailItemClick(e) {
+    // Prevent if long-press selection just happened
+    if (e.detail === 0 && e.pointerType === 'touch') return;
+    const item = e.currentTarget;
+    if (selectedEmailIds.size > 0) {
+        // Toggle selection
+        const id = item.dataset.id;
+        if (selectedEmailIds.has(id)) {
+            selectedEmailIds.delete(id);
+            item.classList.remove('selected');
+        } else {
+            selectedEmailIds.add(id);
+            item.classList.add('selected');
+        }
+        updateDeleteButtonVisibility();
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+    }
+    // No selection mode: go to read
+    if (!item.classList.contains('selected')) {
+        window.location.href = '/read/' + item.dataset.id;
+    }
+}
+
+function handleEmailItemLongPress(e) {
+    // Only on touch devices
+    const item = e.currentTarget;
+    longPressTimer = setTimeout(() => {
+        const id = item.dataset.id;
+        if (!selectedEmailIds.has(id)) {
+            selectedEmailIds.add(id);
+            item.classList.add('selected');
+            updateDeleteButtonVisibility();
+        }
+    }, 500);
+}
+function handleEmailItemTouchEnd(e) {
+    clearTimeout(longPressTimer);
+}
+
+function selectAllMails() {
+    // Select all visible emails
+    document.querySelectorAll('.email-item').forEach(item => {
+        if (item.style.display !== 'none') {
+            selectedEmailIds.add(item.dataset.id);
+            item.classList.add('selected');
+        }
+    });
+    updateDeleteButtonVisibility();
+}
+
+function deleteSelectedMails() {
+    // Example: Remove from UI. You'd do AJAX here in a real app.
+    document.querySelectorAll('.email-item').forEach(item => {
+        if (selectedEmailIds.has(item.dataset.id) && item.style.display !== 'none') {
+            item.remove();
+        }
+    });
+    clearSelections();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.email-item').forEach(item => {
+        // Make sure data-id is present
+        if (!item.dataset.id) return;
+        // Desktop: click to select/deselect if in selection mode, else open
+        item.addEventListener('click', handleEmailItemClick);
+        // Mobile: long-press to select
+        item.addEventListener('touchstart', handleEmailItemLongPress);
+        item.addEventListener('touchend', handleEmailItemTouchEnd);
+    });
+    // Delete button
+    const deleteBtn = document.getElementById('deleteSelectedBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function(e){
+            deleteSelectedMails();
+        });
+    }
+});
+
+// Step 5: Scroll-to-refresh on mobile
+let lastScrollTop = 0;
+const emailList = document.querySelector('.email-list');
+if(emailList) {
+    emailList.addEventListener('scroll', function() {
+        if(emailList.scrollTop === 0 && lastScrollTop > 0 && window.innerWidth <= 768) {
+            refreshMails();
+        }
+        lastScrollTop = emailList.scrollTop;
+    });
+}
+</script>
+
+<!-- Floating Delete Button -->
+<button id="deleteSelectedBtn" style="
+    display: none;
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    background-color: #e53935;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 600;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    font-size: 16px;
+"
+>
+    <i class="fa-solid fa-trash"></i> Delete
+</button>
+
+<!-- Floating Compose Button -->
+<button class="compose-float-btn" onclick="openCompose()">
+    <i class="fa-solid fa-pencil"></i> Compose
+</button>
+
+<script>
+document.querySelectorAll('.email-item').forEach(item => {
+    item.addEventListener('click', () => {
+        const mailId = item.dataset.id;
+        if(mailId){
+            window.location.href = `/read/${mailId}`;
+        }
+    });
+});
+</script>
+</body>
+</html>
+<style>
+/* Highlight selected emails */
+.email-item.selected {
+    background-color: #e3f0fd !important;
+    /* fallback for light */
+    border-left: 4px solid var(--accent);
+}
+@media (prefers-color-scheme: dark) {
+    .email-item.selected {
+        background-color: #174ea6 !important;
+        color: #fff;
+        border-left: 4px solid var(--accent);
+    }
+}
+</style>

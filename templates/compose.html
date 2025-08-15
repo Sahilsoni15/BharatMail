@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compose - BharatMail</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+/* Base styles */
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f2f5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: #202124;
+}
+
+/* Compose container */
+.compose-container {
+    width: 95%;
+    max-width: 700px;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    transition: all 0.3s ease;
+    background-color: #ffffff;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    body { background-color: #18191a; color: #e8eaed; }
+    .compose-container { background-color: #242526; color: #e8eaed; border: 1px solid #3a3b3c; box-shadow: 0 8px 25px rgba(0,0,0,0.5); }
+    input, textarea { background-color: #3a3b3c; color: #e8eaed; border: 1px solid #555; }
+    input::placeholder, textarea::placeholder { color: #cfd0d1; }
+    .attachment-btn { background-color: #3a3b3c; color: #e8eaed; border: 1px solid #555; }
+    .send-btn { background-color: #1a73e8; color: white; }
+    .send-btn:hover { background-color: #1669c1; }
+}
+
+/* Inputs & textarea */
+input, textarea {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background-color: inherit;
+    color: inherit;
+}
+input:focus, textarea:focus {
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 3px rgba(26,115,232,0.2);
+}
+textarea { min-height: 200px; resize: vertical; }
+
+/* Attachments */
+.attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+.attachment-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+    background-color: inherit;
+    color: inherit;
+}
+.attachment-btn:hover { background-color: rgba(0,0,0,0.05); }
+.file-list div { font-size: 13px; margin-top: 2px; color: inherit; }
+
+/* Send button */
+.send-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background-color: #1a73e8;
+    color: white;
+    cursor: pointer;
+    align-self: flex-end;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+.send-btn:hover { background-color: #1669c1; }
+
+.back-btn {
+    text-decoration: none;
+    color: #1a73e8;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+.back-btn:hover { text-decoration: underline; }
+
+.reply-section {
+    margin-top: 15px;
+    border-top: 1px solid rgba(0,0,0,0.1);
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.reply-item {
+    background-color: rgba(26,115,232,0.05);
+    padding: 8px;
+    border-radius: 8px;
+    word-wrap: break-word;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .compose-container { width: 95%; padding: 20px; }
+    .send-btn { width: 100%; text-align: center; }
+    .attachment-btn { width: 100%; justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<div class="compose-container">
+    <a href="/inbox" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Back to Inbox</a>
+    <form method="POST" enctype="multipart/form-data">
+        <input type="text" name="receiver" placeholder="To: user@example.com" value="{{ reply_data.reply_to or '' }}" required>
+        <input type="text" name="subject" placeholder="Subject" value="{{ reply_data.subject or '' }}">
+        <textarea name="message" placeholder="Compose your message..." required>{{ reply_data.message or '' }}</textarea>
+
+        <div class="attachments">
+            <label class="attachment-btn">
+                <i class="fa-solid fa-paperclip"></i> Attach File
+                <input type="file" style="display:none;" multiple name="attachments" id="fileAttach">
+            </label>
+            <div class="file-list" id="fileList"></div>
+        </div>
+
+        <button type="submit" class="send-btn">Send</button>
+    </form>
+
+    <div class="reply-section">
+        <!-- Placeholder for previous messages -->
+    </div>
+</div>
+
+<script>
+const fileInput = document.getElementById('fileAttach');
+const fileList = document.getElementById('fileList');
+fileInput.addEventListener('change', function() {
+    fileList.innerHTML = '';
+    for (let i=0; i<this.files.length; i++) {
+        const fileDiv = document.createElement('div');
+        fileDiv.textContent = this.files[i].name;
+        fileList.appendChild(fileDiv);
+    }
+});
+</script>
+
+</body>
+</html>

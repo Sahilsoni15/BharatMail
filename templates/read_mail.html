@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ mail.subject or 'Read Mail' }} - BharatMail</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+    :root { --accent: #1a73e8; }
+
+    @media (prefers-color-scheme: dark) {
+        body { background-color: #202124; color: #e8eaed; }
+        .container { background-color: #2d2e30; border: 1px solid #3c4043; }
+        .mail-header { border-bottom: 1px solid #3c4043; }
+        .back-btn { color: var(--accent); }
+        .back-btn:hover { background-color: rgba(26, 115, 232, 0.1); }
+        .reply-btn, .forward-btn { background-color: var(--accent); }
+        .reply-btn:hover, .forward-btn:hover { background-color: rgba(26, 115, 232, 0.8); }
+        .attachment-item { background-color: rgba(255, 255, 255, 0.05); }
+        .attachment-item:hover { background-color: rgba(255, 255, 255, 0.1); }
+        .mail-actions { border-top: 1px solid #3c4043; }
+    }
+
+    @media (prefers-color-scheme: light) {
+        body { background-color: #ffffff; color: #000000; }
+        .container { background-color: #ffffff; border: 1px solid #dadce0; }
+        .mail-header { border-bottom: 1px solid #dadce0; }
+        .back-btn { color: var(--accent); }
+        .back-btn:hover { background-color: rgba(26, 115, 232, 0.1); }
+        .reply-btn, .forward-btn { background-color: var(--accent); }
+        .reply-btn:hover, .forward-btn:hover { background-color: rgba(26, 115, 232, 0.8); }
+        .attachment-item { background-color: #f1f3f4; }
+        .attachment-item:hover { background-color: #e8eaed; }
+        .mail-actions { border-top: 1px solid #dadce0; }
+    }
+
+    body {
+        margin: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        padding: 20px;
+        line-height: 1.6;
+    }
+
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .mail-header {
+        padding: 24px 32px;
+        margin-bottom: 0;
+    }
+
+    .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 24px;
+        transition: all 0.2s ease;
+    }
+
+    .mail-subject {
+        font-size: 28px;
+        font-weight: 600;
+        margin: 0 0 16px 0;
+        line-height: 1.3;
+    }
+
+    .mail-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 14px;
+        opacity: 0.8;
+    }
+
+    .mail-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .mail-meta-label {
+        font-weight: 600;
+        min-width: 60px;
+    }
+
+    .mail-content {
+        padding: 32px;
+        font-size: 16px;
+        line-height: 1.7;
+    }
+
+    .mail-message {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0;
+    }
+
+    .attachments {
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .attachments h4 {
+        margin: 0 0 16px 0;
+        font-size: 16px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .attachment-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .attachment-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .attachment-icon {
+        font-size: 18px;
+        color: var(--accent);
+    }
+
+    .attachment-name {
+        font-weight: 500;
+    }
+
+    .mail-actions {
+        padding: 24px 32px;
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .reply-btn, .forward-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background-color: var(--accent);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+
+    .reply-btn:hover, .forward-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
+    }
+
+    .timestamp {
+        font-size: 13px;
+        opacity: 0.6;
+        font-style: italic;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        body {
+            padding: 10px;
+        }
+        
+        .container {
+            border-radius: 8px;
+        }
+        
+        .mail-header {
+            padding: 20px;
+        }
+        
+        .mail-subject {
+            font-size: 22px;
+        }
+        
+        .mail-content {
+            padding: 20px;
+        }
+        
+        .mail-actions {
+            padding: 20px;
+            flex-direction: column;
+        }
+        
+        .reply-btn, .forward-btn {
+            justify-content: center;
+            width: 100%;
+        }
+    }
+
+    /* Loading state */
+    .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        font-size: 16px;
+        opacity: 0.6;
+    }
+
+    /* Error state */
+    .error {
+        background-color: #fef7f0;
+        border: 1px solid #fbceb5;
+        color: #b45309;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px;
+        text-align: center;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .error {
+            background-color: #2d1b0e;
+            border-color: #8b4513;
+            color: #f4a460;
+        }
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        {% if mail %}
+            <div class="mail-header">
+                <a href="/inbox" class="back-btn">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Back to Inbox
+                </a>
+                
+                <h1 class="mail-subject">{{ mail.subject or '(No Subject)' }}</h1>
+                
+                <div class="mail-meta">
+                    <div class="mail-meta-item">
+                        <span class="mail-meta-label">From:</span>
+                        <span>{{ mail.sender }}</span>
+                    </div>
+                    <div class="mail-meta-item">
+                        <span class="mail-meta-label">To:</span>
+                        <span>{{ mail.receiver }}</span>
+                    </div>
+                    {% if mail.cc %}
+                    <div class="mail-meta-item">
+                        <span class="mail-meta-label">CC:</span>
+                        <span>{{ mail.cc }}</span>
+                    </div>
+                    {% endif %}
+                    {% if mail.bcc %}
+                    <div class="mail-meta-item">
+                        <span class="mail-meta-label">BCC:</span>
+                        <span>{{ mail.bcc }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="mail-meta-item">
+                        <span class="mail-meta-label">Date:</span>
+                        <span class="timestamp">{{ mail.timestamp }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mail-content">
+                <div class="mail-message">{{ mail.message or 'This message has no content.' }}</div>
+                
+                {% if mail.attachments and mail.attachments|length > 0 %}
+                <div class="attachments">
+                    <h4>
+                        <i class="fa-solid fa-paperclip"></i>
+                        Attachments ({{ mail.attachments|length }})
+                    </h4>
+                    {% for file in mail.attachments %}
+                    <a href="{{ file }}" class="attachment-item" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-solid fa-file attachment-icon"></i>
+                        <span class="attachment-name">{{ file.split('/')[-1] }}</span>
+                        <i class="fa-solid fa-external-link" style="margin-left: auto; opacity: 0.6;"></i>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="mail-actions">
+                <a href="/compose?reply_to={{ mail.sender }}&subject=Re: {{ mail.subject or '' }}" class="reply-btn">
+                    <i class="fa-solid fa-reply"></i>
+                    Reply
+                </a>
+                <a href="/compose?forward=1&subject=Fwd: {{ mail.subject or '' }}&message={{ mail.message | urlencode }}" class="forward-btn">
+                    <i class="fa-solid fa-share"></i>
+                    Forward
+                </a>
+            </div>
+        {% else %}
+            <div class="error">
+                <i class="fa-solid fa-exclamation-triangle" style="margin-right: 8px;"></i>
+                <strong>Email not found</strong>
+                <p style="margin-top: 8px; opacity: 0.8;">The email you're looking for could not be found or may have been deleted.</p>
+                <a href="/inbox" class="back-btn" style="margin-top: 16px; display: inline-flex;">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Back to Inbox
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
