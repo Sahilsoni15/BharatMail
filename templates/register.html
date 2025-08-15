@@ -214,10 +214,16 @@
     .flash-messages { color: #f28b82; font-size: 13px; margin-bottom: 10px; }
     @media (max-width: 768px) {
         .card { flex-direction: column; }
-        .left-side, .right-side { flex: none; width: 100%; padding: 25px; align-items: center; text-align: center; }
+        .left-side, .right-side { flex: none; width: 100%; padding: 20px; align-items: center; text-align: center; }
         .right-side::before { display: none; }
         .logo { font-size: 32px; }
         h2 { font-size: 22px; }
+    }
+    
+    /* Additional mobile fixes for email field */
+    @media (max-width: 480px) {
+        .left-side, .right-side { padding: 15px; }
+        body { padding: 5px; }
     }
 </style>
 </head>
@@ -251,9 +257,9 @@
             <input type="file" name="profile_pic" id="profilePic" accept="image/*" style="display:none">
             <input type="text" id="first_name" name="first_name" required placeholder="First name" oninput="updateAvatar()">
             <input type="text" id="last_name" name="last_name" required placeholder="Last name" oninput="updateAvatar()">
-            <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <input type="text" id="email" name="email" required placeholder="Choose username" style="flex: 1;">
-                <span style="margin-left: 5px; color: #bdc1c6;">@bharatmail.in</span>
+            <div style="display: flex; align-items: center; margin-bottom: 15px; box-sizing: border-box; width: 100%;">
+                <input type="text" id="email" name="email" required placeholder="Choose username" style="flex: 1; min-width: 0; box-sizing: border-box;">
+                <span style="margin-left: 5px; color: #bdc1c6; white-space: nowrap; flex-shrink: 0;">@bharatmail.in</span>
             </div>
             <input type="password" id="password" name="password" required placeholder="Password">
             <button type="submit" class="btn-register">Create account</button>
