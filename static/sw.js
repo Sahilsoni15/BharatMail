@@ -1,17 +1,25 @@
-// Service Worker for BharatMail Push Notifications
-const CACHE_NAME = 'bharatmail-v1';
+// Service Worker for BharatMail Push Notifications - Mobile Optimized
+const CACHE_NAME = 'bharatmail-mobile-v2';
 const urlsToCache = [
   '/',
   '/static/logo.png',
+  '/static/logo-192.png',
+  '/static/logo-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css'
 ];
 
-// Install event - cache resources
+// Mobile device detection
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// Install event - cache resources with mobile optimization
 self.addEventListener('install', function(event) {
+  console.log('Service Worker installing with mobile optimization');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(function(cache) {
-        console.log('Opened cache');
+        console.log('Opened cache for mobile');
         return cache.addAll(urlsToCache);
       })
   );
@@ -30,7 +38,7 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
-// Push event - handle incoming push notifications
+// Push event - handle incoming push notifications with mobile optimization
 self.addEventListener('push', function(event) {
   console.log('Push message received:', event);
   
@@ -41,31 +49,51 @@ self.addEventListener('push', function(event) {
       notificationData = event.data.json();
     } catch (e) {
       notificationData = {
-        title: 'New Email',
+        title: '📧 New Email',
         body: event.data.text(),
-        icon: '/static/logo.png',
+        icon: '/static/logo-192.png',
         badge: '/static/logo.png'
       };
     }
   } else {
     notificationData = {
-      title: 'New Email',
+      title: '📧 New Email - BharatMail',
       body: 'You have received a new email',
-      icon: '/static/logo.png',
+      icon: '/static/logo-192.png',
       badge: '/static/logo.png'
     };
   }
 
+  // Mobile-optimized vibration patterns
+  const vibrationPattern = isMobile() ? [200, 100, 200, 100, 200] : [100, 50, 100];
+  
+  // Choose appropriate icon size for mobile
+  const iconUrl = isMobile() ? '/static/logo-192.png' : '/static/logo.png';
+  
   const notificationOptions = {
     body: notificationData.body,
-    icon: notificationData.icon || '/static/logo.png',
-    badge: notificationData.badge || '/static/logo.png',
-    vibrate: [100, 50, 100],
+    icon: notificationData.icon || iconUrl,
+    badge: '/static/logo.png',
+    vibrate: vibrationPattern,
+    silent: false,
+    timestamp: Date.now(),
     data: {
       url: notificationData.url || '/inbox',
-      mailId: notificationData.mailId || null
+      mailId: notificationData.mailId || null,
+      timestamp: Date.now()
     },
-    actions: [
+    actions: isMobile() ? [
+      {
+        action: 'open',
+        title: '📖 Open',
+        icon: '/static/logo.png'
+      },
+      {
+        action: 'dismiss',
+        title: '✖️ Dismiss',
+        icon: '/static/logo.png'
+      }
+    ] : [
       {
         action: 'open',
         title: 'Open Email',
@@ -77,9 +105,17 @@ self.addEventListener('push', function(event) {
         icon: '/static/logo.png'
       }
     ],
-    requireInteraction: true,
-    tag: 'bharatmail-notification'
+    requireInteraction: isMobile(), // More aggressive on mobile
+    tag: 'bharatmail-notification',
+    renotify: true,
+    sticky: isMobile() // Sticky on mobile for better visibility
   };
+
+  // Add mobile-specific options
+  if (isMobile()) {
+    notificationOptions.dir = 'auto';
+    notificationOptions.lang = 'en';
+  }
 
   event.waitUntil(
     self.registration.showNotification(notificationData.title, notificationOptions)

@@ -2,9 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="theme-color" content="#2196F3">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="BharatMail">
+<meta name="msapplication-TileColor" content="#2196F3">
+<meta name="msapplication-tap-highlight" content="no">
 <title>BharatMail - Inbox</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/logo-192.png">
+<link rel="apple-touch-icon" href="/static/logo-192.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script>
     // Make CSRF token available globally
@@ -533,6 +543,9 @@
             </div>
             <div class="dropdown-item" onclick="window.location.href='/manage_profile'">
                 <i class="fa-solid fa-user-gear"></i> Manage Profile
+            </div>
+            <div class="dropdown-item" onclick="showMobileNotificationSettings()">
+                <i class="fa-solid fa-bell"></i> Notification Settings
             </div>
             <div class="dropdown-item" onclick="window.location.href='/logout'">
                 <i class="fa-solid fa-right-from-bracket"></i> Logout
@@ -1191,11 +1204,32 @@ async function initializeNotifications() {
     }
 }
 
-// Show notification permission prompt
+// Show notification permission prompt with mobile optimization
 function showNotificationPrompt() {
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
     const promptDiv = document.createElement('div');
     promptDiv.id = 'notification-prompt';
-    promptDiv.style.cssText = `
+    
+    // Mobile-optimized styling
+    const mobileStyles = isMobileDevice ? `
+        position: fixed;
+        top: ${isPortrait ? '60px' : '10px'};
+        left: 10px;
+        right: 10px;
+        transform: none;
+        background: #2196F3;
+        color: white;
+        padding: ${isPortrait ? '20px' : '15px'};
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        z-index: 1001;
+        font-size: ${isPortrait ? '16px' : '14px'};
+        text-align: center;
+        backdrop-filter: blur(10px);
+        animation: slideInFromTop 0.3s ease-out;
+    ` : `
         position: fixed;
         top: 60px;
         left: 50%;
@@ -1211,24 +1245,113 @@ function showNotificationPrompt() {
         text-align: center;
     `;
     
+    promptDiv.style.cssText = mobileStyles;
+    
+    // Mobile-optimized content
     promptDiv.innerHTML = `
-        <div style="margin-bottom: 10px;">
-            <i class="fa-solid fa-bell" style="margin-right: 8px;"></i>
-            <strong>Enable Email Notifications?</strong>
+        <div style="margin-bottom: ${isMobileDevice ? '15px' : '10px'};">
+            <i class="fa-solid fa-bell" style="margin-right: 8px; font-size: ${isMobileDevice ? '20px' : '16px'};"></i>
+            <strong style="font-size: ${isMobileDevice ? '18px' : '14px'};">📱 Enable Push Notifications?</strong>
         </div>
-        <p style="margin: 8px 0; font-size: 13px;">Get notified when you receive new emails</p>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-            <button onclick="enableNotifications()" style="background: white; color: #2196F3; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Enable</button>
-            <button onclick="dismissNotificationPrompt()" style="background: transparent; color: white; border: 1px solid white; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Later</button>
+        <p style="margin: ${isMobileDevice ? '12px' : '8px'} 0; font-size: ${isMobileDevice ? '14px' : '13px'}; line-height: 1.4;">Get instant alerts for new emails on your ${isMobileDevice ? 'mobile device' : 'desktop'}</p>
+        <div style="display: flex; gap: ${isMobileDevice ? '15px' : '10px'}; justify-content: center; margin-top: ${isMobileDevice ? '20px' : '15px'};">
+            <button onclick="enableNotifications()" style="
+                background: white; 
+                color: #2196F3; 
+                border: none; 
+                padding: ${isMobileDevice ? '12px 20px' : '6px 12px'}; 
+                border-radius: ${isMobileDevice ? '8px' : '4px'}; 
+                cursor: pointer; 
+                font-weight: bold;
+                font-size: ${isMobileDevice ? '16px' : '14px'};
+                min-width: ${isMobileDevice ? '80px' : 'auto'};
+                touch-action: manipulation;
+            ">✅ Enable</button>
+            <button onclick="dismissNotificationPrompt()" style="
+                background: transparent; 
+                color: white; 
+                border: 2px solid white; 
+                padding: ${isMobileDevice ? '12px 20px' : '6px 12px'}; 
+                border-radius: ${isMobileDevice ? '8px' : '4px'}; 
+                cursor: pointer;
+                font-size: ${isMobileDevice ? '16px' : '14px'};
+                min-width: ${isMobileDevice ? '80px' : 'auto'};
+                touch-action: manipulation;
+            ">⏰ Later</button>
         </div>
     `;
     
+    // Add mobile-specific animation styles
+    if (isMobileDevice && !document.querySelector('#mobile-notification-styles')) {
+        const mobileStyles = document.createElement('style');
+        mobileStyles.id = 'mobile-notification-styles';
+        mobileStyles.textContent = `
+            @keyframes slideInFromTop {
+                from {
+                    opacity: 0;
+                    transform: translateY(-100px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            @keyframes slideOutToTop {
+                from {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateY(-100px);
+                }
+            }
+            
+            #notification-prompt button {
+                transition: all 0.2s ease;
+            }
+            
+            #notification-prompt button:hover {
+                transform: scale(1.05);
+            }
+            
+            #notification-prompt button:active {
+                transform: scale(0.95);
+            }
+        `;
+        document.head.appendChild(mobileStyles);
+    }
+    
     document.body.appendChild(promptDiv);
     
-    // Auto-dismiss after 10 seconds
+    // Auto-dismiss after longer time on mobile for better UX
+    const dismissTime = isMobileDevice ? 15000 : 10000;
     setTimeout(() => {
         dismissNotificationPrompt();
-    }, 10000);
+    }, dismissTime);
+    
+    // Add touch event listeners for better mobile interaction
+    if (isMobileDevice) {
+        promptDiv.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Dismiss on swipe up
+        let touchStartY = 0;
+        promptDiv.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        promptDiv.addEventListener('touchend', (e) => {
+            const touchEndY = e.changedTouches[0].clientY;
+            const swipeDistance = touchStartY - touchEndY;
+            
+            if (swipeDistance > 50) { // Swipe up to dismiss
+                dismissNotificationPrompt();
+            }
+        });
+    }
 }
 
 // Enable notifications
@@ -1348,46 +1471,160 @@ function startPeriodicEmailChecking() {
     }, 30000); // Check every 30 seconds
 }
 
-// Show browser notification for new emails
+// Show browser notification for new emails with mobile optimization
 function showBrowserNotification(emails) {
     if (emails && emails.length > 0) {
         const firstEmail = emails[0];
-        const title = `New email from ${firstEmail.sender}`;
-        const body = firstEmail.subject || '(No subject)';
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         
-        const notification = new Notification(title, {
+        // Enhanced mobile-friendly notification content
+        const title = emails.length === 1 
+            ? `📧 ${firstEmail.sender}` 
+            : `📧 ${emails.length} new emails`;
+        
+        const body = emails.length === 1 
+            ? firstEmail.subject || '(No subject)'
+            : `From: ${firstEmail.sender}${emails.length > 1 ? ` +${emails.length - 1} more` : ''}`;
+        
+        // Mobile-specific notification options
+        const notificationOptions = {
             body: body,
-            icon: '/static/logo.png',
+            icon: isMobileDevice ? '/static/logo-192.png' : '/static/logo.png',
             badge: '/static/logo.png',
             tag: 'bharatmail-new-email',
-            requireInteraction: true,
-            actions: [
+            requireInteraction: isMobileDevice, // More persistent on mobile
+            silent: false,
+            vibrate: isMobileDevice ? [200, 100, 200] : undefined,
+            timestamp: Date.now(),
+            data: {
+                emailId: firstEmail.id,
+                totalEmails: emails.length,
+                url: `/read/${firstEmail.id}`
+            }
+        };
+        
+        // Add action buttons (not supported on iOS)
+        if (!isIOS && 'actions' in Notification.prototype) {
+            notificationOptions.actions = [
                 {
                     action: 'open',
-                    title: 'Open Email'
+                    title: isMobileDevice ? '👀 View' : 'Open Email',
+                    icon: '/static/logo.png'
                 },
                 {
                     action: 'dismiss',
-                    title: 'Dismiss'
+                    title: isMobileDevice ? '❌' : 'Dismiss',
+                    icon: '/static/logo.png'
                 }
-            ]
-        });
+            ];
+        }
         
-        notification.onclick = function() {
-            window.focus();
-            if (firstEmail.id) {
-                window.location.href = `/read/${firstEmail.id}`;
-            } else {
-                window.location.href = '/inbox';
+        // Enhanced notification creation with error handling
+        try {
+            const notification = new Notification(title, notificationOptions);
+            
+            // Enhanced click handler for mobile
+            notification.onclick = function(event) {
+                event.preventDefault();
+                
+                // Focus window on mobile/desktop
+                if (window.focus) {
+                    window.focus();
+                }
+                
+                // Navigate to email
+                const targetUrl = firstEmail.id ? `/read/${firstEmail.id}` : '/inbox';
+                
+                if (isMobileDevice) {
+                    // On mobile, try to open in same tab
+                    window.location.href = targetUrl;
+                } else {
+                    // On desktop, try to focus existing tab or open new one
+                    if (document.hasFocus()) {
+                        window.location.href = targetUrl;
+                    } else {
+                        window.open(targetUrl, '_blank');
+                    }
+                }
+                
+                notification.close();
+            };
+            
+            // Handle notification errors
+            notification.onerror = function(event) {
+                console.error('Notification error:', event);
+            };
+            
+            // Enhanced auto-close timing based on device
+            const autoCloseTime = isMobileDevice ? 15000 : 10000; // Longer on mobile
+            setTimeout(() => {
+                if (notification) {
+                    notification.close();
+                }
+            }, autoCloseTime);
+            
+            // Log for debugging
+            console.log(`Mobile notification shown: ${title}`, {
+                isMobile: isMobileDevice,
+                isIOS: isIOS,
+                emailCount: emails.length
+            });
+            
+        } catch (error) {
+            console.error('Failed to create notification:', error);
+            
+            // Fallback: show in-app notification for mobile browsers with issues
+            if (isMobileDevice) {
+                showInAppNotification(title, body);
             }
-            notification.close();
-        };
-        
-        // Auto-close after 10 seconds
-        setTimeout(() => {
-            notification.close();
-        }, 10000);
+        }
     }
+}
+
+// Fallback in-app notification for mobile browsers that don't support native notifications
+function showInAppNotification(title, body) {
+    const inAppNotification = document.createElement('div');
+    inAppNotification.className = 'in-app-notification';
+    inAppNotification.style.cssText = `
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        background: #2196F3;
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10001;
+        font-size: 14px;
+        animation: slideInFromTop 0.3s ease-out;
+        cursor: pointer;
+    `;
+    
+    inAppNotification.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
+        <div style="font-size: 13px; opacity: 0.9;">${body}</div>
+        <div style="position: absolute; top: 5px; right: 10px; font-size: 18px; cursor: pointer;" onclick="this.parentElement.remove();">×</div>
+    `;
+    
+    inAppNotification.addEventListener('click', () => {
+        window.location.href = '/inbox';
+    });
+    
+    document.body.appendChild(inAppNotification);
+    
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+        if (inAppNotification.parentNode) {
+            inAppNotification.style.animation = 'slideOutToTop 0.3s ease-in';
+            setTimeout(() => {
+                if (inAppNotification.parentNode) {
+                    inAppNotification.remove();
+                }
+            }, 300);
+        }
+    }, 8000);
 }
 
 // Disable notifications
@@ -1412,6 +1649,251 @@ async function disableNotifications() {
         console.error('Error disabling notifications:', error);
         showNotification('Error disabling notifications', 'error');
     }
+}
+
+// Mobile notification settings panel
+function showMobileNotificationSettings() {
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    // Close dropdown first
+    document.getElementById('profileDropdown').style.display = 'none';
+    
+    const settingsPanel = document.createElement('div');
+    settingsPanel.id = 'notification-settings-panel';
+    
+    const panelStyles = isMobileDevice ? `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 10002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        backdrop-filter: blur(5px);
+    ` : `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 10002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+    `;
+    
+    settingsPanel.style.cssText = panelStyles;
+    
+    const panelContent = document.createElement('div');
+    panelContent.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: ${isMobileDevice ? '24px' : '32px'};
+        max-width: ${isMobileDevice ? '90vw' : '450px'};
+        width: 100%;
+        max-height: ${isMobileDevice ? '80vh' : '70vh'};
+        overflow-y: auto;
+        box-shadow: 0 16px 32px rgba(0,0,0,0.2);
+        animation: slideInFromTop 0.3s ease-out;
+    `;
+    
+    // Dark mode support
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        panelContent.style.background = '#2d2e30';
+        panelContent.style.color = '#e8eaed';
+    }
+    
+    panelContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; font-size: ${isMobileDevice ? '20px' : '24px'}; display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-bell" style="color: #2196F3;"></i>
+                Notification Settings
+            </h2>
+            <button onclick="closeMobileNotificationSettings()" style="
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #666;
+                padding: 5px;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">&times;</button>
+        </div>
+        
+        <div style="margin-bottom: 20px; padding: 16px; background: rgba(33,150,243,0.1); border-radius: 8px; border-left: 4px solid #2196F3;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <i class="fa-solid fa-info-circle" style="color: #2196F3;"></i>
+                <strong>Current Status</strong>
+            </div>
+            <div id="notification-status" style="font-size: 14px;">Checking...</div>
+        </div>
+        
+        <div style="margin-bottom: 24px;">
+            <h3 style="font-size: ${isMobileDevice ? '16px' : '18px'}; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-mobile-alt" style="color: #4CAF50;"></i>
+                ${isMobileDevice ? 'Mobile' : 'Desktop'} Notifications
+            </h3>
+            <div style="margin-bottom: 16px;">
+                <button id="enable-notifications-btn" onclick="enableNotificationsFromSettings()" style="
+                    background: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: ${isMobileDevice ? '12px 20px' : '10px 16px'};
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: ${isMobileDevice ? '16px' : '14px'};
+                    font-weight: bold;
+                    margin-right: 10px;
+                    touch-action: manipulation;
+                ">
+                    <i class="fa-solid fa-check"></i> Enable Notifications
+                </button>
+                <button id="disable-notifications-btn" onclick="disableNotificationsFromSettings()" style="
+                    background: #f44336;
+                    color: white;
+                    border: none;
+                    padding: ${isMobileDevice ? '12px 20px' : '10px 16px'};
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: ${isMobileDevice ? '16px' : '14px'};
+                    font-weight: bold;
+                    touch-action: manipulation;
+                    display: none;
+                ">
+                    <i class="fa-solid fa-times"></i> Disable Notifications
+                </button>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 24px;">
+            <h3 style="font-size: ${isMobileDevice ? '16px' : '18px'}; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-cogs" style="color: #FF9800;"></i>
+                Settings
+            </h3>
+            <div style="background: rgba(0,0,0,0.05); padding: 16px; border-radius: 8px;">
+                <div style="margin-bottom: 12px; font-size: 14px;">
+                    <strong>How notifications work:</strong>
+                </div>
+                <ul style="font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.5;">
+                    <li>Real-time alerts for new emails</li>
+                    <li>${isMobileDevice ? 'Vibration support on mobile devices' : 'Desktop notifications with sound'}</li>
+                    <li>Works even when the app is closed</li>
+                    <li>Can be managed in your browser settings</li>
+                </ul>
+            </div>
+        </div>
+        
+        ${isMobileDevice ? `
+        <div style="margin-bottom: 20px; padding: 12px; background: rgba(255,152,0,0.1); border-radius: 6px; border-left: 3px solid #FF9800;">
+            <div style="font-size: 13px; color: #F57F17;">
+                <i class="fa-solid fa-exclamation-triangle" style="margin-right: 5px;"></i>
+                <strong>Mobile Tip:</strong> Add this app to your home screen for the best notification experience!
+            </div>
+        </div>
+        ` : ''}
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <button onclick="closeMobileNotificationSettings()" style="
+                background: #2196F3;
+                color: white;
+                border: none;
+                padding: ${isMobileDevice ? '12px 32px' : '10px 24px'};
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: ${isMobileDevice ? '16px' : '14px'};
+                font-weight: bold;
+                touch-action: manipulation;
+            ">Done</button>
+        </div>
+    `;
+    
+    settingsPanel.appendChild(panelContent);
+    document.body.appendChild(settingsPanel);
+    
+    // Update status
+    updateNotificationStatusDisplay();
+    
+    // Close on background click
+    settingsPanel.addEventListener('click', (e) => {
+        if (e.target === settingsPanel) {
+            closeMobileNotificationSettings();
+        }
+    });
+}
+
+function closeMobileNotificationSettings() {
+    const panel = document.getElementById('notification-settings-panel');
+    if (panel) {
+        panel.remove();
+    }
+}
+
+async function updateNotificationStatusDisplay() {
+    const statusDiv = document.getElementById('notification-status');
+    const enableBtn = document.getElementById('enable-notifications-btn');
+    const disableBtn = document.getElementById('disable-notifications-btn');
+    
+    if (!statusDiv) return;
+    
+    const permission = Notification.permission;
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    let statusText = '';
+    let statusColor = '';
+    
+    try {
+        const status = await getNotificationStatus();
+        
+        if (permission === 'granted' && status.subscribed && isNotificationsEnabled) {
+            statusText = `✅ Notifications are enabled and working on your ${isMobileDevice ? 'mobile device' : 'desktop'}`;
+            statusColor = '#4CAF50';
+            enableBtn.style.display = 'none';
+            disableBtn.style.display = 'inline-block';
+        } else if (permission === 'granted' && !status.subscribed) {
+            statusText = `⚠️ Permission granted but not subscribed. Click 'Enable Notifications' to fix this.`;
+            statusColor = '#FF9800';
+            enableBtn.style.display = 'inline-block';
+            disableBtn.style.display = 'none';
+        } else if (permission === 'denied') {
+            statusText = `❌ Notifications are blocked. Please enable them in your browser settings.`;
+            statusColor = '#f44336';
+            enableBtn.style.display = 'none';
+            disableBtn.style.display = 'none';
+        } else {
+            statusText = `⏰ Notifications are not yet enabled. Click 'Enable Notifications' to get started.`;
+            statusColor = '#666';
+            enableBtn.style.display = 'inline-block';
+            disableBtn.style.display = 'none';
+        }
+    } catch (error) {
+        statusText = '❌ Unable to check notification status';
+        statusColor = '#f44336';
+    }
+    
+    statusDiv.innerHTML = statusText;
+    statusDiv.style.color = statusColor;
+}
+
+async function enableNotificationsFromSettings() {
+    await enableNotifications();
+    setTimeout(updateNotificationStatusDisplay, 1000);
+}
+
+async function disableNotificationsFromSettings() {
+    await disableNotifications();
+    setTimeout(updateNotificationStatusDisplay, 1000);
 }
 
 // Initialize notifications when page loads
