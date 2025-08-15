@@ -247,8 +247,13 @@
         <!-- Left Side -->
         <div class="left-side">
             <div class="logo">BharatMail</div>
+            {% if add_mode %}
+            <h2>Add Account</h2>
+            <p class="subtitle">Add another BharatMail account</p>
+            {% else %}
             <h2>Sign in</h2>
             <p class="subtitle">Use your BharatMail account</p>
+            {% endif %}
         </div>
 
         <!-- Right Side -->

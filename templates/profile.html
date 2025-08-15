@@ -249,42 +249,85 @@
 </div>
 
 <script>
-// Handle profile picture file input change
-document.getElementById('profile_pic').addEventListener('change', function(event) {
-    const file = event.target.files[0];
+console.log('Profile page JavaScript loaded');
+
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing profile picture handlers');
+    
+    const profilePicInput = document.getElementById('profile_pic');
+    const changePhotoBtn = document.querySelector('.change-photo');
     const profileWrapper = document.querySelector('.profile-wrapper');
     
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            // Remove existing profile pic or initials
-            const existingImg = profileWrapper.querySelector('img');
-            const existingDiv = profileWrapper.querySelector('.profile-pic');
+    console.log('Elements found:', {
+        profilePicInput: !!profilePicInput,
+        changePhotoBtn: !!changePhotoBtn,
+        profileWrapper: !!profileWrapper
+    });
+    
+    if (profilePicInput && changePhotoBtn && profileWrapper) {
+        // Handle camera button click
+        changePhotoBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Camera button clicked');
+            profilePicInput.click();
+        });
+        
+        // Handle profile picture file input change
+        profilePicInput.addEventListener('change', function(event) {
+            console.log('File input changed');
+            const file = event.target.files[0];
             
-            if (existingImg) {
-                existingImg.remove();
+            if (file) {
+                console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
+                
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    alert('Please select an image file');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    console.log('File read successfully, updating preview');
+                    
+                    // Remove existing profile pic or initials
+                    const existingImg = profileWrapper.querySelector('img');
+                    const existingDiv = profileWrapper.querySelector('.profile-pic');
+                    
+                    if (existingImg) {
+                        console.log('Removing existing img');
+                        existingImg.remove();
+                    }
+                    if (existingDiv) {
+                        console.log('Removing existing div');
+                        existingDiv.remove();
+                    }
+                    
+                    // Create new image element
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.alt = 'Profile Picture';
+                    img.className = 'profile-pic';
+                    
+                    // Insert before the label (camera button)
+                    const label = profileWrapper.querySelector('label');
+                    profileWrapper.insertBefore(img, label);
+                    
+                    console.log('Preview updated successfully');
+                };
+                reader.onerror = function() {
+                    console.error('Error reading file');
+                    alert('Error reading file. Please try again.');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                console.log('No file selected');
             }
-            if (existingDiv) {
-                existingDiv.remove();
-            }
-            
-            // Create new image element
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.alt = 'Profile Picture';
-            img.className = 'profile-pic';
-            
-            // Insert before the label (camera button)
-            const label = profileWrapper.querySelector('label');
-            profileWrapper.insertBefore(img, label);
-        };
-        reader.readAsDataURL(file);
+        });
+    } else {
+        console.error('Required elements not found!');
     }
-});
-
-// Handle camera button click
-document.querySelector('.change-photo').addEventListener('click', function() {
-    document.getElementById('profile_pic').click();
 });
 </script>
 

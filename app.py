@@ -190,15 +190,38 @@ def login():
             if user['password'] == password:
                 if not add_mode:
                     # Normal login clears everything
+                    print(f"\n=== NORMAL LOGIN ===")
+                    print(f"Clearing session and logging in: {email}")
                     session.clear()
-
-                session['user_email'] = email
-                accounts = session.get('accounts', [])
-                if email not in accounts:
-                    accounts.append(email)
-                session['accounts'] = accounts
-
-                flash(f"Welcome {user['first_name']}! You are logged in as {email}")
+                    session['user_email'] = email
+                    accounts = [email]  # Start fresh with just this account
+                    session['accounts'] = accounts
+                    print(f"Session after normal login: {dict(session)}")
+                    flash(f"Welcome {user['first_name']}! You are now logged in as {email}")
+                else:
+                    # Add account mode - preserve existing sessions
+                    print(f"\n=== ADD ACCOUNT MODE ===")
+                    current_user = session.get('user_email')
+                    print(f"Current user before adding: {current_user}")
+                    print(f"Session before adding account: {dict(session)}")
+                    print(f"Adding account: {email}")
+                    
+                    session['user_email'] = email  # Switch to new account immediately
+                    accounts = session.get('accounts', [])
+                    print(f"Existing accounts: {accounts}")
+                    if email not in accounts:
+                        accounts.append(email)
+                        print(f"Added {email} to accounts list")
+                    else:
+                        print(f"{email} already in accounts list")
+                    session['accounts'] = accounts
+                    print(f"Final accounts list: {accounts}")
+                    print(f"Session after adding account: {dict(session)}")
+                    
+                    if current_user:
+                        flash(f"Account {email} added successfully! You are now using {email}. You can switch back to {current_user} anytime.")
+                    else:
+                        flash(f"Welcome {user['first_name']}! You are now logged in as {email}")
                 return redirect("/inbox")
             else:
                 flash("Incorrect password! Try again.")
@@ -257,16 +280,32 @@ def inbox():
     categorized_mails["Drafts"] = list(draft_messages.values())
 
     accounts = session.get('accounts', [])
+    
+    # Debug information
+    print(f"\n=== DEBUG ACCOUNT INFO ===")
+    print(f"Current email: {current_email}")
+    print(f"All accounts in session: {accounts}")
+    print(f"Session contents: {dict(session)}")
 
     other_accounts = []
     for acc_email in accounts:
         if acc_email != current_email:
+            print(f"Processing other account: {acc_email}")
             acc_data = firebase.ref.child("users").child(acc_email.replace(".", ",")).get()
             if acc_data:
+                account_name = f"{acc_data.get('first_name', '')} {acc_data.get('last_name', '')}".strip()
+                if not account_name:
+                    account_name = acc_email.split('@')[0].replace('.', ' ').title()
                 other_accounts.append({
                     "email": acc_email,
-                    "name": f"{acc_data.get('first_name', '')} {acc_data.get('last_name', '')}".strip()
+                    "name": account_name
                 })
+                print(f"Added account: {acc_email} -> {account_name}")
+            else:
+                print(f"No user data found for: {acc_email}")
+    
+    print(f"Final other_accounts: {other_accounts}")
+    print(f"=== END DEBUG ===")
 
     colors = ["#ff5733", "#33a1ff", "#8e44ad", "#27ae60", "#f39c12"]
     profile_bg_color = random.choice(colors)
@@ -300,7 +339,19 @@ def inbox():
 @app.route("/switch_account/<email>")
 def switch_account(email):
     if email in session.get('accounts', []):
+        previous_email = session.get('user_email')
         session['user_email'] = email
+        # Get user info for better messaging
+        user_data = firebase.ref.child("users").child(email.replace(".", ",")).get()
+        if user_data:
+            user_name = f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip()
+            if not user_name:
+                user_name = email.split('@')[0]
+            flash(f"Switched to {user_name} ({email})")
+        else:
+            flash(f"Switched to {email}")
+    else:
+        flash(f"Cannot switch to {email} - account not found in your logged in accounts")
     return redirect("/inbox")
 
 # Compose with draft support and categorization on send
@@ -468,6 +519,11 @@ def update_profile():
     if not user_email:
         return redirect("/login")
 
+    print(f"\n=== PROFILE UPDATE DEBUG ====")
+    print(f"User: {user_email}")
+    print(f"Form data: {dict(request.form)}")
+    print(f"Files in request: {list(request.files.keys())}")
+    
     name = request.form.get("name", "").strip()
     phone = request.form.get("phone", "").strip()
     password = request.form.get("password", "").strip()
@@ -482,48 +538,90 @@ def update_profile():
 
     if password:
         updates["password"] = password
+        print("Password will be updated")
 
+    # Handle profile picture
+    profile_pic_updated = False
     if remove_pic:
+        print("Removing profile picture and generating new avatar")
         updates["profile_pic"] = generate_avatar(first_name, last_name)
+        profile_pic_updated = True
     elif "profile_pic" in request.files:
         file = request.files["profile_pic"]
-        if file and file.filename:
+        print(f"Profile pic file: {file}")
+        print(f"Filename: {getattr(file, 'filename', 'No filename attr')}")
+        print(f"Content type: {getattr(file, 'content_type', 'No content_type attr')}")
+        print(f"Content length: {getattr(file, 'content_length', 'No content_length attr')}")
+        
+        if file and hasattr(file, 'filename') and file.filename and file.filename.strip():
             try:
+                print(f"Processing uploaded file: {file.filename}")
                 import base64
                 from io import BytesIO
                 
                 # Reset file pointer to beginning
                 file.seek(0)
+                file_data = file.read()
+                print(f"File size: {len(file_data)} bytes")
                 
-                # Open the uploaded image
-                img = Image.open(file)
+                if len(file_data) == 0:
+                    print("ERROR: File data is empty!")
+                    flash("Uploaded file is empty. Please try again.")
+                else:
+                    # Reset file pointer and open image
+                    file.seek(0)
+                    img = Image.open(file)
+                    print(f"Image opened successfully. Size: {img.size}, Mode: {img.mode}")
 
-                # Crop to square (center crop)
-                width, height = img.size
-                min_dim = min(width, height)
-                left = (width - min_dim) / 2
-                top = (height - min_dim) / 2
-                right = (width + min_dim) / 2
-                bottom = (height + min_dim) / 2
-                img = img.crop((left, top, right, bottom))
+                    # Crop to square (center crop)
+                    width, height = img.size
+                    min_dim = min(width, height)
+                    left = (width - min_dim) / 2
+                    top = (height - min_dim) / 2
+                    right = (width + min_dim) / 2
+                    bottom = (height + min_dim) / 2
+                    img = img.crop((left, top, right, bottom))
+                    print(f"Image cropped to: {img.size}")
 
-                # Resize to standard profile size
-                img = img.resize((200, 200))
+                    # Resize to standard profile size
+                    img = img.resize((200, 200))
+                    print(f"Image resized to: {img.size}")
 
-                # Convert to base64 data URL for cloud deployment compatibility
-                buffer = BytesIO()
-                img.save(buffer, format='PNG')
-                img_data = buffer.getvalue()
-                img_base64 = base64.b64encode(img_data).decode('utf-8')
-                updates["profile_pic"] = f"data:image/png;base64,{img_base64}"
-                
-                flash("Profile picture updated successfully!")
+                    # Convert to base64 data URL for cloud deployment compatibility
+                    buffer = BytesIO()
+                    img.save(buffer, format='PNG')
+                    img_data = buffer.getvalue()
+                    img_base64 = base64.b64encode(img_data).decode('utf-8')
+                    data_url = f"data:image/png;base64,{img_base64}"
+                    print(f"Base64 data URL created, length: {len(data_url)}")
+                    
+                    updates["profile_pic"] = data_url
+                    profile_pic_updated = True
+                    flash("Profile picture updated successfully!")
+                    print("Profile picture processing completed successfully")
+                    
             except Exception as e:
-                print(f"Error processing profile picture: {e}")
-                flash("Error updating profile picture. Please try again.")
+                print(f"ERROR processing profile picture: {e}")
+                import traceback
+                traceback.print_exc()
+                flash(f"Error updating profile picture: {str(e)}")
+        else:
+            print("No valid file uploaded for profile picture")
+    else:
+        print("No profile_pic in request.files")
 
-    user_ref.update(updates)
-    flash("Profile updated successfully!")
+    print(f"Final updates to be saved: {list(updates.keys())}")
+    print(f"Profile pic updated: {profile_pic_updated}")
+    
+    try:
+        user_ref.update(updates)
+        print("Database update completed successfully")
+        flash("Profile updated successfully!")
+    except Exception as e:
+        print(f"ERROR updating database: {e}")
+        flash(f"Error saving profile: {str(e)}")
+    
+    print("=== END PROFILE UPDATE DEBUG ====\n")
     return redirect("/profile")
 
 # Logout specific account
@@ -655,6 +753,16 @@ def read_mail(mail_id):
         return redirect("/inbox")
 
     return render_template("read_mail.html", mail=mail)
+
+# Debug route to check session
+@app.route("/debug/session")
+def debug_session():
+    return jsonify({
+        "session_data": dict(session),
+        "user_email": session.get('user_email'),
+        "accounts": session.get('accounts', []),
+        "session_keys": list(session.keys())
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5001))

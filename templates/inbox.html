@@ -486,8 +486,8 @@
             </div>
         {% endif %}
         <div class="dropdown" id="profileDropdown">
-            <!-- Current User -->
-            <div class="dropdown-header">
+            <!-- Current Active Account -->
+            <div class="dropdown-header active-account">
                 {% if user_profile_pic %}
                     <img src="{{ user_profile_pic }}" alt="Profile">
                 {% else %}
@@ -497,18 +497,22 @@
                 {% endif %}
                 <strong>{{ user_name }}</strong>
                 <small>{{ user_email }}</small>
+                <div class="active-indicator"><i class="fa-solid fa-check-circle"></i> Currently active</div>
             </div>
 
-            <!-- Other Accounts -->
+            <!-- Other Available Accounts -->
+            {% if other_accounts %}
+            <div class="accounts-section-header">Switch to:</div>
             {% for acc in other_accounts %}
-            <div class="dropdown-item">
-                <span onclick="window.location.href='/switch_account/{{ acc.email }}'" style="flex:1;cursor:pointer;">
-                    {{ acc.name }}<br><small>{{ acc.email }}</small>
+            <div class="dropdown-item account-item">
+                <span onclick="window.location.href='/switch_account/{{ acc.email }}'" style="flex:1;cursor:pointer;" title="Switch to this account">
+                    <strong>{{ acc.name }}</strong><br><small>{{ acc.email }}</small>
                 </span>
-                <i class="fa-solid fa-right-from-bracket" title="Logout" style="color:red;cursor:pointer;margin-left:10px;"
+                <i class="fa-solid fa-right-from-bracket logout-btn" title="Remove this account" 
                    onclick="window.location.href='/logout/{{ acc.email }}'"></i>
             </div>
             {% endfor %}
+            {% endif %}
 
             <div class="dropdown-item" onclick="window.location.href='/login?add=1'">
                 <i class="fa-solid fa-plus"></i> Add account
@@ -918,6 +922,74 @@ document.querySelectorAll('.email-item').forEach(item => {
 </body>
 </html>
 <style>
+/* Account dropdown styling */
+.active-account {
+    background: linear-gradient(135deg, rgba(26,115,232,0.1), rgba(26,115,232,0.05));
+    border: 2px solid rgba(26,115,232,0.3);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.active-indicator {
+    color: #1a73e8;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.accounts-section-header {
+    padding: 8px 15px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #5f6368;
+    border-bottom: 1px solid rgba(128,128,128,0.1);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.account-item {
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    margin: 2px 6px;
+}
+
+.account-item:hover {
+    background-color: rgba(26,115,232,0.08) !important;
+    transform: translateX(2px);
+}
+
+.logout-btn {
+    color: #e53935 !important;
+    font-size: 16px;
+    padding: 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    background-color: rgba(229,57,53,0.1);
+    transform: scale(1.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .active-account {
+        background: linear-gradient(135deg, rgba(26,115,232,0.2), rgba(26,115,232,0.1));
+        border-color: rgba(26,115,232,0.4);
+    }
+    
+    .accounts-section-header {
+        color: #9aa0a6;
+    }
+    
+    .account-item:hover {
+        background-color: rgba(26,115,232,0.15) !important;
+    }
+}
+
 /* Highlight selected emails */
 .email-item.selected {
     background-color: #e3f0fd !important;
