@@ -10,14 +10,14 @@ import time
 import secrets
 from functools import wraps
 app = Flask(__name__)
-app.permanent_session_lifetime = timedelta(hours=8)  # Session expires after 8 hours
+app.permanent_session_lifetime = timedelta(days=60)  # Session expires after 60 days
 
 # Configure session security
 app.config.update(
     SESSION_COOKIE_SECURE=True if os.environ.get('HTTPS') == 'true' else False,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=8)
+    PERMANENT_SESSION_LIFETIME=timedelta(days=60)
 )
 
 @app.before_request
@@ -27,7 +27,7 @@ def make_session_permanent():
     # Check for session timeout
     if 'last_activity' in session:
         last_activity = datetime.fromisoformat(session['last_activity'])
-        if datetime.now() - last_activity > timedelta(hours=8):
+        if datetime.now() - last_activity > timedelta(days=60):
             session.clear()
             flash('Session expired. Please log in again.')
             return redirect('/login')
@@ -515,12 +515,17 @@ def compose():
         # Save in receiver's inbox
         receiver_key = receiver.replace(".", ",")
         inbox_ref = firebase.ref.child("inbox").child(receiver_key).push(mail_data)
+        mail_data['id'] = inbox_ref.key  # Add the mail ID for notifications
         print(f"Saved to receiver inbox: {inbox_ref.key}")
         
         # Save in sender's sent folder
         sender_key = sender.replace(".", ",")
         sent_ref = firebase.ref.child("sent").child(sender_key).push(mail_data)
         print(f"Saved to sender sent: {sent_ref.key}")
+        
+        # Send push notification to receiver
+        send_push_notification(receiver, mail_data)
+        
         print(f"=== END SENDING MAIL ===")
         flash("Message sent successfully!")
         return redirect("/inbox")
@@ -816,11 +821,15 @@ def send_mail():
 
     # Save in receiver's inbox
     receiver_key = to_email.replace(".", ",")
-    firebase.ref.child("inbox").child(receiver_key).push(mail_data)
+    inbox_ref = firebase.ref.child("inbox").child(receiver_key).push(mail_data)
+    mail_data['id'] = inbox_ref.key  # Add the mail ID for notifications
     
     # Save in sender's sent folder
     user_key = current_email.replace(".", ",")
     firebase.ref.child("sent").child(user_key).push(mail_data)
+    
+    # Send push notification to receiver
+    send_push_notification(to_email, mail_data)
 
     flash("Mail sent successfully!")
     return redirect("/inbox")
@@ -860,6 +869,178 @@ def uploaded_file(filename):
         from flask import abort
         abort(404)
     return send_from_directory(upload_folder, filename)
+
+# Notification subscription management
+@app.route("/api/subscribe", methods=["POST"])
+def subscribe_notifications():
+    current_email = session.get('user_email')
+    if not current_email:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Validate CSRF token
+    csrf_token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not validate_csrf_token(csrf_token):
+        return jsonify({'error': 'Invalid CSRF token'}), 403
+        
+    try:
+        data = request.get_json()
+        if not data or 'subscription' not in data:
+            return jsonify({'error': 'Invalid subscription data'}), 400
+            
+        subscription = data['subscription']
+        user_key = current_email.replace(".", ",")
+        
+        # Store subscription in Firebase
+        firebase.ref.child("notifications").child(user_key).set({
+            'subscription': subscription,
+            'enabled': True,
+            'created_at': str(datetime.now()),
+            'user_email': current_email
+        })
+        
+        return jsonify({'success': True, 'message': 'Notification subscription saved'})
+        
+    except Exception as e:
+        print(f"Error saving notification subscription: {e}")
+        return jsonify({'error': 'Failed to save subscription'}), 500
+
+@app.route("/api/unsubscribe", methods=["POST"])
+def unsubscribe_notifications():
+    current_email = session.get('user_email')
+    if not current_email:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Validate CSRF token
+    csrf_token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not validate_csrf_token(csrf_token):
+        return jsonify({'error': 'Invalid CSRF token'}), 403
+        
+    try:
+        user_key = current_email.replace(".", ",")
+        
+        # Update subscription status in Firebase
+        firebase.ref.child("notifications").child(user_key).update({
+            'enabled': False,
+            'updated_at': str(datetime.now())
+        })
+        
+        return jsonify({'success': True, 'message': 'Notifications disabled'})
+        
+    except Exception as e:
+        print(f"Error disabling notifications: {e}")
+        return jsonify({'error': 'Failed to disable notifications'}), 500
+
+@app.route("/api/notification-status", methods=["GET"])
+def get_notification_status():
+    current_email = session.get('user_email')
+    if not current_email:
+        return jsonify({'error': 'Not authenticated'}), 401
+        
+    try:
+        user_key = current_email.replace(".", ",")
+        notification_data = firebase.ref.child("notifications").child(user_key).get()
+        
+        if notification_data:
+            return jsonify({
+                'enabled': notification_data.get('enabled', False),
+                'subscribed': bool(notification_data.get('subscription'))
+            })
+        else:
+            return jsonify({'enabled': False, 'subscribed': False})
+            
+    except Exception as e:
+        print(f"Error getting notification status: {e}")
+        return jsonify({'error': 'Failed to get notification status'}), 500
+
+# Function to send push notification (called when new email arrives)
+def send_push_notification(user_email, mail_data):
+    """Send push notification to user when they receive a new email"""
+    try:
+        user_key = user_email.replace(".", ",")
+        notification_data = firebase.ref.child("notifications").child(user_key).get()
+        
+        if not notification_data or not notification_data.get('enabled'):
+            print(f"Notifications not enabled for {user_email}")
+            return
+            
+        subscription = notification_data.get('subscription')
+        if not subscription:
+            print(f"No subscription found for {user_email}")
+            return
+            
+        # Format notification message
+        sender = mail_data.get('sender', 'Unknown')
+        subject = mail_data.get('subject', '(No subject)')
+        
+        notification_payload = {
+            'title': f'New email from {sender}',
+            'body': subject,
+            'icon': '/static/logo.png',
+            'badge': '/static/logo.png',
+            'url': '/inbox',
+            'mailId': mail_data.get('id')
+        }
+        
+        # Here you would integrate with a push service like FCM, OneSignal, etc.
+        # For now, we'll just log the notification
+        print(f"\n=== PUSH NOTIFICATION ===")
+        print(f"To: {user_email}")
+        print(f"Title: {notification_payload['title']}")
+        print(f"Body: {notification_payload['body']}")
+        print(f"=== END NOTIFICATION ===")
+        
+        # In a real implementation, you would send the notification here:
+        # send_to_push_service(subscription, notification_payload)
+        
+    except Exception as e:
+        print(f"Error sending push notification: {e}")
+
+# Check for new emails API (for real-time checking)
+@app.route("/api/check-new-emails", methods=["POST"])
+@rate_limit(max_requests=30, per_seconds=60)  # Allow 30 checks per minute
+def check_new_emails():
+    current_email = session.get('user_email')
+    if not current_email:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Validate CSRF token
+    csrf_token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    if not validate_csrf_token(csrf_token):
+        return jsonify({'error': 'Invalid CSRF token'}), 403
+    
+    try:
+        user_key = current_email.replace(".", ",")
+        
+        # Get last check timestamp from session or use 5 minutes ago
+        last_check = session.get('last_email_check')
+        if last_check:
+            last_check_time = datetime.fromisoformat(last_check)
+        else:
+            last_check_time = datetime.now() - timedelta(minutes=5)
+            
+        # Fetch recent messages
+        inbox_ref = firebase.ref.child("inbox").child(user_key).get() or {}
+        new_emails = []
+        
+        for key, m in inbox_ref.items():
+            if m.get('receiver') == current_email:
+                email_time = datetime.fromisoformat(m.get('timestamp', '2000-01-01T00:00:00'))
+                if email_time > last_check_time:
+                    m['id'] = key
+                    new_emails.append(m)
+        
+        # Update last check timestamp
+        session['last_email_check'] = datetime.now().isoformat()
+        
+        return jsonify({
+            'success': True,
+            'new_emails': len(new_emails),
+            'emails': new_emails[:5]  # Return max 5 new emails
+        })
+        
+    except Exception as e:
+        print(f"Error checking new emails: {e}")
+        return jsonify({'error': 'Failed to check new emails'}), 500
 
 # Secure refresh API endpoint
 @app.route("/api/refresh", methods=["POST"])

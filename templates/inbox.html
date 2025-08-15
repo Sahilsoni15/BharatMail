@@ -9,6 +9,11 @@
 <script>
     // Make CSRF token available globally
     window.csrfToken = "{{ csrf_token() }}";
+    
+    // Notification system initialization
+    let notificationPermission = 'default';
+    let serviceWorkerRegistration = null;
+    let isNotificationsEnabled = false;
 </script>
 
 <style>
@@ -1135,6 +1140,286 @@ document.addEventListener('DOMContentLoaded', function() {
             deleteSelectedMails();
         });
     }
+});
+
+// === NOTIFICATION SYSTEM ===
+
+// Initialize notification system
+async function initializeNotifications() {
+    console.log('Initializing notification system...');
+    
+    // Check if notifications are supported
+    if (!('Notification' in window)) {
+        console.log('This browser does not support notifications');
+        return;
+    }
+    
+    // Check if service workers are supported
+    if (!('serviceWorker' in navigator)) {
+        console.log('This browser does not support service workers');
+        return;
+    }
+    
+    try {
+        // Register service worker
+        serviceWorkerRegistration = await navigator.serviceWorker.register('/static/sw.js');
+        console.log('Service Worker registered successfully:', serviceWorkerRegistration);
+        
+        // Check current notification permission
+        notificationPermission = Notification.permission;
+        console.log('Current notification permission:', notificationPermission);
+        
+        // Get notification status from server
+        const status = await getNotificationStatus();
+        isNotificationsEnabled = status.enabled;
+        
+        // Show notification prompt if permission is default
+        if (notificationPermission === 'default') {
+            showNotificationPrompt();
+        } else if (notificationPermission === 'granted' && !status.subscribed) {
+            // Subscribe if permission granted but not subscribed
+            await subscribeToNotifications();
+        }
+        
+        // Start periodic email checking if notifications are enabled
+        if (isNotificationsEnabled && notificationPermission === 'granted') {
+            startPeriodicEmailChecking();
+        }
+        
+    } catch (error) {
+        console.error('Error initializing notifications:', error);
+    }
+}
+
+// Show notification permission prompt
+function showNotificationPrompt() {
+    const promptDiv = document.createElement('div');
+    promptDiv.id = 'notification-prompt';
+    promptDiv.style.cssText = `
+        position: fixed;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2196F3;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 1001;
+        font-size: 14px;
+        max-width: 400px;
+        text-align: center;
+    `;
+    
+    promptDiv.innerHTML = `
+        <div style="margin-bottom: 10px;">
+            <i class="fa-solid fa-bell" style="margin-right: 8px;"></i>
+            <strong>Enable Email Notifications?</strong>
+        </div>
+        <p style="margin: 8px 0; font-size: 13px;">Get notified when you receive new emails</p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button onclick="enableNotifications()" style="background: white; color: #2196F3; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Enable</button>
+            <button onclick="dismissNotificationPrompt()" style="background: transparent; color: white; border: 1px solid white; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Later</button>
+        </div>
+    `;
+    
+    document.body.appendChild(promptDiv);
+    
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+        dismissNotificationPrompt();
+    }, 10000);
+}
+
+// Enable notifications
+async function enableNotifications() {
+    try {
+        notificationPermission = await Notification.requestPermission();
+        console.log('Notification permission result:', notificationPermission);
+        
+        if (notificationPermission === 'granted') {
+            await subscribeToNotifications();
+            showNotification('Notifications enabled! You\'ll now receive alerts for new emails.', 'success');
+            startPeriodicEmailChecking();
+        } else {
+            showNotification('Notifications were not enabled. You can enable them later in your browser settings.', 'error');
+        }
+        
+        dismissNotificationPrompt();
+        
+    } catch (error) {
+        console.error('Error enabling notifications:', error);
+        showNotification('Error enabling notifications', 'error');
+        dismissNotificationPrompt();
+    }
+}
+
+// Dismiss notification prompt
+function dismissNotificationPrompt() {
+    const prompt = document.getElementById('notification-prompt');
+    if (prompt) {
+        prompt.remove();
+    }
+}
+
+// Subscribe to push notifications
+async function subscribeToNotifications() {
+    try {
+        if (!serviceWorkerRegistration) {
+            console.error('Service worker not registered');
+            return;
+        }
+        
+        // Get push subscription
+        const subscription = await serviceWorkerRegistration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: null // You would use your VAPID public key here
+        });
+        
+        console.log('Push subscription:', subscription);
+        
+        // Send subscription to server
+        const response = await fetch('/api/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
+            body: JSON.stringify({ subscription: subscription.toJSON() }),
+            credentials: 'same-origin'
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            console.log('Subscription saved successfully');
+            isNotificationsEnabled = true;
+        } else {
+            console.error('Failed to save subscription:', result.error);
+        }
+        
+    } catch (error) {
+        console.error('Error subscribing to notifications:', error);
+    }
+}
+
+// Get notification status from server
+async function getNotificationStatus() {
+    try {
+        const response = await fetch('/api/notification-status', {
+            credentials: 'same-origin'
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Error getting notification status:', error);
+        return { enabled: false, subscribed: false };
+    }
+}
+
+// Start periodic email checking
+function startPeriodicEmailChecking() {
+    // Check for new emails every 30 seconds
+    setInterval(async () => {
+        try {
+            const response = await fetch('/api/check-new-emails', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken()
+                },
+                credentials: 'same-origin'
+            });
+            
+            const result = await response.json();
+            if (result.success && result.new_emails > 0) {
+                console.log(`Found ${result.new_emails} new emails`);
+                
+                // Show browser notification for new emails
+                if (notificationPermission === 'granted') {
+                    showBrowserNotification(result.emails);
+                }
+                
+                // Optionally refresh the email list
+                // performRefresh();
+            }
+            
+        } catch (error) {
+            console.error('Error checking for new emails:', error);
+        }
+    }, 30000); // Check every 30 seconds
+}
+
+// Show browser notification for new emails
+function showBrowserNotification(emails) {
+    if (emails && emails.length > 0) {
+        const firstEmail = emails[0];
+        const title = `New email from ${firstEmail.sender}`;
+        const body = firstEmail.subject || '(No subject)';
+        
+        const notification = new Notification(title, {
+            body: body,
+            icon: '/static/logo.png',
+            badge: '/static/logo.png',
+            tag: 'bharatmail-new-email',
+            requireInteraction: true,
+            actions: [
+                {
+                    action: 'open',
+                    title: 'Open Email'
+                },
+                {
+                    action: 'dismiss',
+                    title: 'Dismiss'
+                }
+            ]
+        });
+        
+        notification.onclick = function() {
+            window.focus();
+            if (firstEmail.id) {
+                window.location.href = `/read/${firstEmail.id}`;
+            } else {
+                window.location.href = '/inbox';
+            }
+            notification.close();
+        };
+        
+        // Auto-close after 10 seconds
+        setTimeout(() => {
+            notification.close();
+        }, 10000);
+    }
+}
+
+// Disable notifications
+async function disableNotifications() {
+    try {
+        const response = await fetch('/api/unsubscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
+            credentials: 'same-origin'
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            isNotificationsEnabled = false;
+            showNotification('Notifications disabled', 'success');
+        }
+        
+    } catch (error) {
+        console.error('Error disabling notifications:', error);
+        showNotification('Error disabling notifications', 'error');
+    }
+}
+
+// Initialize notifications when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize notification system after a short delay
+    setTimeout(() => {
+        initializeNotifications();
+    }, 1000);
 });
 
 // Step 5: Scroll-to-refresh on mobile
