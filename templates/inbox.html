@@ -29,22 +29,22 @@
 <style>
     :root { --accent: #1a73e8; }
 
-    @media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: dark) {
         body { background-color: #202124; color: #e8eaed; }
         .sidebar { background-color: #2d2e30; border-right: 1px solid #3c4043; }
         .email-item:hover { background-color: #3c4043; }
         .dropdown { background-color: #2d2e30; color: white; border: 1px solid #3c4043; }
         .dropdown-item:hover { background-color: #3c4043; }
-        #mailSearch { background-color: #3c4043; color: white; border: 1px solid #5f6368; }
+        #mailSearch, #mobileMailSearch { background-color: #3c4043; color: white; border: 1px solid #5f6368; }
     }
 
-    @media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: light) {
         body { background-color: #ffffff; color: #000000; }
         .sidebar { background-color: #f1f3f4; border-right: 1px solid #dadce0; }
         .email-item:hover { background-color: #f1f3f4; }
         .dropdown { background-color: white; color: black; border: 1px solid #dadce0; }
         .dropdown-item:hover { background-color: #f1f3f4; }
-        #mailSearch { background-color: white; color: black; border: 1px solid #ccc; }
+        #mailSearch, #mobileMailSearch { background-color: white; color: black; border: 1px solid #ccc; }
     }
 
     body {
@@ -253,9 +253,97 @@
         color: var(--accent);
         margin-left: 10px;
     }
+    
+    /* Mobile search container - hidden by default */
+    .mobile-search-container {
+        display: none;
+    }
 
-    @media (max-width: 768px) {
-        .top-btn { display: none; }
+@media (max-width: 768px) {
+        .top-btn { 
+            display: none; 
+        }
+        
+        /* Show select buttons on mobile when there are selections */
+        .top-btn.mobile-select-btn { 
+            display: flex !important;
+            font-size: 16px;
+            padding: 8px;
+            margin-left: 5px;
+            border-radius: 6px;
+            background: rgba(26, 115, 232, 0.1);
+        }
+        
+        /* Mobile search styling */
+        .mobile-search-container {
+            display: flex;
+            flex: 1;
+            max-width: 60%;
+            position: relative;
+            margin: 0 10px;
+        }
+        
+        #mobileMailSearch {
+            width: 100%;
+            padding: 6px 10px 6px 30px;
+            border-radius: 20px;
+            font-size: 14px;
+            border: 1px solid rgba(128,128,128,0.3);
+            background-color: rgba(255,255,255,0.1);
+            color: inherit;
+        }
+        
+        .mobile-search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent);
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        /* Hide desktop search on mobile */
+        .desktop-only {
+            display: none;
+        }
+        
+        /* Mobile selection toolbar */
+        .mobile-selection-toolbar {
+            position: fixed;
+            bottom: 70px;
+            left: 10px;
+            right: 10px;
+            background: var(--accent);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 700;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .mobile-selection-toolbar.show {
+            display: flex;
+        }
+        
+        .mobile-selection-toolbar button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-left: 8px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        
+        .mobile-selection-toolbar button:hover {
+            background: rgba(255,255,255,0.3);
+        }
     }
 
     .email-search {
@@ -301,7 +389,7 @@
     }
 
     /* Responsive */
-    @media (max-width: 1024px) {
+@media (max-width: 1024px) {
         .sidebar {
             /* Removed transform from here to avoid conflict */
         }
@@ -310,6 +398,14 @@
         }
         .top-bar {
             left: 0 !important;
+        }
+        
+        /* Show mobile search, hide desktop search */
+        .mobile-search-container {
+            display: flex;
+        }
+        .desktop-only {
+            display: none;
         }
     }
 
@@ -493,6 +589,13 @@
         <div id="selectionInfo" style="display:none; margin-left: 15px; font-size: 12px; color: var(--accent); background: rgba(26,115,232,0.1); padding: 4px 8px; border-radius: 12px;">
             <span id="selectedCount">0</span> selected
         </div>
+        
+        <!-- Mobile Search Bar - Shown only on mobile devices -->
+        <div class="mobile-search-container">
+            <input type="text" id="mobileMailSearch" placeholder="Search mails...">
+            <i class="fa-solid fa-search mobile-search-icon"></i>
+        </div>
+        
         <div style="flex:1"></div>
         {% if user_profile_pic %}
             <img src="{{ user_profile_pic }}" alt="Profile" class="profile-pic" onclick="toggleDropdown()">
@@ -594,10 +697,22 @@
         </form>
     </div>
 
+    <!-- Mobile Selection Toolbar -->
+    <div class="mobile-selection-toolbar" id="mobileSelectionToolbar">
+        <div>
+            <span id="mobileSelectedCount">0</span> selected
+        </div>
+        <div>
+            <button onclick="selectAllMails()" id="mobileSelectAllBtn"><i class="fa-solid fa-check-double"></i></button>
+            <button onclick="deleteSelectedMails()"><i class="fa-solid fa-trash"></i></button>
+            <button onclick="deselectAllMails()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
     <!-- Email Section -->
     <div class="email-section">
-        <!-- Mail Search -->
-        <div class="email-search">
+        <!-- Desktop Mail Search - Hidden on mobile -->
+        <div class="email-search desktop-only">
             <input type="text" id="mailSearch" placeholder="Search mails...">
         </div>
 
@@ -682,14 +797,40 @@ function filterCategory(category) {
     updateDeleteButtonVisibility();
 }
 
-// Mail search functionality
-document.getElementById('mailSearch').addEventListener('input', function() {
-    const filter = this.value.toLowerCase();
-    document.querySelectorAll('#mailList .email-item').forEach(function(item) {
-        const text = item.innerText.toLowerCase();
-        item.style.display = text.includes(filter) ? '' : 'none';
-    });
-    updateDeleteButtonVisibility();
+// Mail search functionality for both desktop and mobile
+function setupSearchListeners() {
+    const desktopSearch = document.getElementById('mailSearch');
+    const mobileSearch = document.getElementById('mobileMailSearch');
+    
+    const performSearch = function(filter) {
+        filter = filter.toLowerCase();
+        document.querySelectorAll('#mailList .email-item').forEach(function(item) {
+            const text = item.innerText.toLowerCase();
+            item.style.display = text.includes(filter) ? '' : 'none';
+        });
+        updateDeleteButtonVisibility();
+    };
+    
+    if (desktopSearch) {
+        desktopSearch.addEventListener('input', function() {
+            performSearch(this.value);
+            // Sync with mobile search
+            if (mobileSearch) mobileSearch.value = this.value;
+        });
+    }
+    
+    if (mobileSearch) {
+        mobileSearch.addEventListener('input', function() {
+            performSearch(this.value);
+            // Sync with desktop search
+            if (desktopSearch) desktopSearch.value = this.value;
+        });
+    }
+}
+
+// Initialize search functionality when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setupSearchListeners();
 });
 
 // Sidebar toggle for all screens
@@ -1020,8 +1161,10 @@ function updateDeleteButtonVisibility() {
     const deleteBtn = document.getElementById('deleteSelectedBtn');
     const selectionInfo = document.getElementById('selectionInfo');
     const selectedCount = document.getElementById('selectedCount');
+    const mobileToolbar = document.getElementById('mobileSelectionToolbar');
+    const mobileSelectedCount = document.getElementById('mobileSelectedCount');
     
-    if (!deleteBtn || !selectionInfo || !selectedCount) return;
+    if (!deleteBtn || !selectionInfo || !selectedCount || !mobileToolbar || !mobileSelectedCount) return;
     
     // Count visible selected emails
     let visibleSelectedCount = 0;
@@ -1036,6 +1179,18 @@ function updateDeleteButtonVisibility() {
     deleteBtn.style.display = hasSelection ? 'flex' : 'none';
     selectionInfo.style.display = hasSelection ? 'block' : 'none';
     selectedCount.textContent = visibleSelectedCount;
+
+    // Show/hide mobile selection toolbar
+    if (window.innerWidth <= 768) {
+        if (hasSelection) {
+            mobileToolbar.classList.add('show');
+            mobileSelectedCount.textContent = visibleSelectedCount;
+        } else {
+            mobileToolbar.classList.remove('show');
+        }
+    } else {
+        mobileToolbar.classList.remove('show');
+    }
 }
 
 function clearSelections() {
