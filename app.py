@@ -6,7 +6,6 @@ import random
 import os
 from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
-
 app = Flask(__name__)
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
@@ -24,8 +23,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 from PIL import Image, ImageDraw, ImageFont
-import os, random
-
 # Avatar background colors
 AVATAR_COLORS = [
     "#FF5733", "#33A1FF", "#28A745", "#FFC300",
@@ -71,7 +68,6 @@ def generate_avatar(first_name, last_name, font_path="DejaVuSans-Bold.ttf"):
     draw = ImageDraw.Draw(img)
 
     # Add subtle gradient effect
-    from PIL import ImageDraw, ImageFilter
     
     # Create a subtle inner shadow/gradient effect
     overlay = Image.new('RGBA', (img_size, img_size), (0, 0, 0, 0))
@@ -435,12 +431,34 @@ def profile():
         return redirect("/login")
 
     user = firebase.ref.child("users").child(user_email.replace(".", ",")).get()
+    
+    # Generate profile background color
+    colors = ["#ff5733", "#33a1ff", "#8e44ad", "#27ae60", "#f39c12"]
+    profile_bg_color = random.choice(colors)
+    
+    # Create user_name with fallback
+    first_name = user.get('first_name', '').strip()
+    last_name = user.get('last_name', '').strip()
+    user_name = f"{first_name} {last_name}".strip()
+    
+    # If user_name is empty, use email prefix as fallback
+    if not user_name:
+        user_name = user_email.split('@')[0].replace('.', ' ').title()
+        # Also set fallback first/last names for initials
+        name_parts = user_name.split()
+        first_name = name_parts[0] if name_parts else 'U'
+        last_name = name_parts[1] if len(name_parts) > 1 else 'N'
+    
     return render_template(
         "profile.html",
         user=user,
         user_email=user_email,
-        user_first_name=user.get("first_name", ""),
-        user_last_name=user.get("last_name", "")
+        user_name=user_name,
+        user_first_name=first_name,
+        user_last_name=last_name,
+        user_phone=user.get("phone", ""),
+        user_profile_pic=user.get("profile_pic", None),
+        profile_bg_color=profile_bg_color
     )
 
 # Profile Update

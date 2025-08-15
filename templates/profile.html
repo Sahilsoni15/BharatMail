@@ -205,7 +205,9 @@
             {% if user_profile_pic %}
                 <img src="{{ user_profile_pic }}" alt="Profile Picture" class="profile-pic">
             {% else %}
-                {% set initials = (user_first_name[0] ~ user_last_name[0])|upper %}
+                {% set first_initial = user_first_name[0] if user_first_name else 'U' %}
+                {% set last_initial = user_last_name[0] if user_last_name else 'N' %}
+                {% set initials = (first_initial ~ last_initial)|upper %}
                 <div class="profile-pic" style="background-color: {{ profile_bg_color }};">
                     {{ initials }}
                 </div>
