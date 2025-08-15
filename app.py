@@ -57,6 +57,9 @@ def categorize_mail(subject, message):
         return "Inbox"
 
 def generate_avatar(first_name, last_name, font_path="DejaVuSans-Bold.ttf"):
+    import base64
+    from io import BytesIO
+    
     initials = ((first_name[0] if first_name else "") + (last_name[0] if last_name else "")).upper()
     if not initials.strip():
         initials = "U"
@@ -90,13 +93,12 @@ def generate_avatar(first_name, last_name, font_path="DejaVuSans-Bold.ttf"):
     position = ((img_size - w)/2, (img_size - h)/2)
     draw.text(position, initials, fill="white", font=font)
 
-    # Ensure the upload folder exists
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
-    filename = f"avatar_{random.randint(1000,9999)}.png"
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    img.save(filepath)
-    return f"/static/profile_pics/{filename}"
+    # Convert to base64 data URL for cloud deployment compatibility
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    img_data = buffer.getvalue()
+    img_base64 = base64.b64encode(img_data).decode('utf-8')
+    return f"data:image/png;base64,{img_base64}"
 
 
 # ---------------- Routes ----------------
@@ -437,6 +439,9 @@ def update_profile():
     elif "profile_pic" in request.files:
         file = request.files["profile_pic"]
         if file.filename:
+            import base64
+            from io import BytesIO
+            
             # Open the uploaded image
             img = Image.open(file)
 
@@ -452,15 +457,12 @@ def update_profile():
             # Resize to standard profile size
             img = img.resize((200, 200))
 
-            # Ensure upload folder exists
-            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
-            # Save the cropped image
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            img.save(filepath)
-
-            updates["profile_pic"] = f"/static/profile_pics/{filename}"
+            # Convert to base64 data URL for cloud deployment compatibility
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            img_data = buffer.getvalue()
+            img_base64 = base64.b64encode(img_data).decode('utf-8')
+            updates["profile_pic"] = f"data:image/png;base64,{img_base64}"
 
     user_ref.update(updates)
     flash("Profile updated successfully!")
