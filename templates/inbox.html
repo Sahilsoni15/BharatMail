@@ -975,132 +975,35 @@
 
         <!-- Email List -->
         <div class="email-list" id="mailList">
-            <!-- Inbox Messages -->
-            {% for m in categorized_mails['Inbox'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Inbox" data-timestamp="{{ m.timestamp }}">
+            <!-- All emails in chronological order -->
+            {% for m in all_emails_sorted %}
+            <div class="email-item" data-id="{{ m.id }}" data-category="{{ m.category or 'Inbox' }}" data-timestamp="{{ m.timestamp }}">
                 <div class="email-avatar">
-                    {% if m.sender_avatar %}
-                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
-                    {% else %}
-                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
-                            {{ m.sender_initials }}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="email-content">
-                    <div class="email-header">
-                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
-                        <span class="email-time">{{ m.formatted_time }}</span>
-                    </div>
-                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
-                    <div class="email-preview">{{ m.message_preview }}</div>
-                </div>
-            </div>
-            {% endfor %}
-            
-            <!-- Promotions Messages -->
-            {% for m in categorized_mails['Promotions'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Promotions" data-timestamp="{{ m.timestamp }}">
-                <div class="email-avatar">
-                    {% if m.sender_avatar %}
-                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
-                    {% else %}
-                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
-                            {{ m.sender_initials }}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="email-content">
-                    <div class="email-header">
-                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
-                        <span class="email-time">{{ m.formatted_time }}</span>
-                    </div>
-                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
-                    <div class="email-preview">{{ m.message_preview }}</div>
-                </div>
-            </div>
-            {% endfor %}
-            
-            <!-- Social Messages -->
-            {% for m in categorized_mails['Social'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Social" data-timestamp="{{ m.timestamp }}">
-                <div class="email-avatar">
-                    {% if m.sender_avatar %}
-                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
-                    {% else %}
-                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
-                            {{ m.sender_initials }}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="email-content">
-                    <div class="email-header">
-                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
-                        <span class="email-time">{{ m.formatted_time }}</span>
-                    </div>
-                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
-                    <div class="email-preview">{{ m.message_preview }}</div>
-                </div>
-            </div>
-            {% endfor %}
-            
-            <!-- Updates Messages -->
-            {% for m in categorized_mails['Updates'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Updates" data-timestamp="{{ m.timestamp }}">
-                <div class="email-avatar">
-                    {% if m.sender_avatar %}
-                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
-                    {% else %}
-                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color }};">
-                            {{ m.sender_initials }}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="email-content">
-                    <div class="email-header">
-                        <strong class="email-sender">{{ m.sender_name or m.sender }}</strong>
-                        <span class="email-time">{{ m.formatted_time }}</span>
-                    </div>
-                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
-                    <div class="email-preview">{{ m.message_preview }}</div>
-                </div>
-            </div>
-            {% endfor %}
-            
-            <!-- Sent Messages -->
-            {% for m in categorized_mails['Sent'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Sent" data-timestamp="{{ m.timestamp }}">
-                <div class="email-avatar">
-                    {% if m.receiver_avatar %}
+                    {% if (m.category or 'Inbox') == 'Sent' and m.receiver_avatar %}
                         <img src="{{ m.receiver_avatar }}" alt="Avatar" class="avatar-img">
+                    {% elif (m.category or 'Inbox') == 'Drafts' %}
+                        <div class="avatar-initials draft-avatar" style="background-color: #FF9800;">
+                            <i class="fa-solid fa-file-lines"></i>
+                        </div>
+                    {% elif m.sender_avatar %}
+                        <img src="{{ m.sender_avatar }}" alt="Avatar" class="avatar-img">
                     {% else %}
-                        <div class="avatar-initials" style="background-color: {{ m.receiver_avatar_color }};">
-                            {{ m.receiver_initials }}
+                        <div class="avatar-initials" style="background-color: {{ m.sender_avatar_color if (m.category or 'Inbox') != 'Sent' else m.receiver_avatar_color }};">
+                            {{ m.sender_initials if (m.category or 'Inbox') != 'Sent' else m.receiver_initials }}
                         </div>
                     {% endif %}
                 </div>
                 <div class="email-content">
                     <div class="email-header">
-                        <strong class="email-sender">To: {{ m.receiver_name or m.receiver }}</strong>
-                        <span class="email-time">{{ m.formatted_time }}</span>
-                    </div>
-                    <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
-                    <div class="email-preview">{{ m.message_preview }}</div>
-                </div>
-            </div>
-            {% endfor %}
-            
-            <!-- Draft Messages -->
-            {% for m in categorized_mails['Drafts'] %}
-            <div class="email-item" data-id="{{ m.id }}" data-category="Drafts" data-timestamp="{{ m.timestamp }}">
-                <div class="email-avatar">
-                    <div class="avatar-initials draft-avatar" style="background-color: #FF9800;">
-                        <i class="fa-solid fa-file-lines"></i>
-                    </div>
-                </div>
-                <div class="email-content">
-                    <div class="email-header">
-                        <strong class="email-sender">Draft to: {{ m.receiver_name or m.receiver or 'No recipient' }}</strong>
+                        <strong class="email-sender">
+                            {% if (m.category or 'Inbox') == 'Sent' %}
+                                To: {{ m.receiver_name or m.receiver }}
+                            {% elif (m.category or 'Inbox') == 'Drafts' %}
+                                Draft to: {{ m.receiver_name or m.receiver or 'No recipient' }}
+                            {% else %}
+                                {{ m.sender_name or m.sender }}
+                            {% endif %}
+                        </strong>
                         <span class="email-time">{{ m.formatted_time }}</span>
                     </div>
                     <div class="email-subject">{{ m.subject or '(No subject)' }}</div>
@@ -1593,7 +1496,9 @@ function performRefresh() {
     })
     .then(data => {
         if (data.success) {
-            updateEmailList(data.categorized_mails);
+            // Use unified sorted list if available, otherwise fall back to categorized approach
+            const allEmailsSorted = data.all_emails_sorted || null;
+            updateEmailList(data.categorized_mails, allEmailsSorted);
             showRefreshSuccess(data.total_messages);
             lastRefreshTime = Date.now();
         } else {
@@ -1635,38 +1540,83 @@ function getCsrfToken() {
 }
 
 // Update email list with new data
-function updateEmailList(categorizedMails) {
+function updateEmailList(categorizedMails, allEmailsSorted) {
     const mailListElement = document.getElementById('mailList');
     if (!mailListElement) return;
     
     // Clear existing emails
     mailListElement.innerHTML = '';
     
-    // Add emails by category
-    const categories = ['Inbox', 'Promotions', 'Social', 'Updates', 'Sent', 'Drafts'];
+    // Use unified sorted list if available, otherwise fall back to categorized approach
+    let emailsToDisplay = allEmailsSorted || [];
     
-    categories.forEach(category => {
-        const mails = categorizedMails[category] || [];
-        mails.forEach(mail => {
+    // If no unified list, create one from categorized mails
+    if (!emailsToDisplay.length) {
+        emailsToDisplay = [];
+        const categories = ['Inbox', 'Promotions', 'Social', 'Updates', 'Sent', 'Drafts'];
+        categories.forEach(category => {
+            const mails = categorizedMails[category] || [];
+            emailsToDisplay.push(...mails);
+        });
+        // Sort by timestamp
+        emailsToDisplay.sort((a, b) => {
+            const timeA = a.timestamp || '';
+            const timeB = b.timestamp || '';
+            return timeB.localeCompare(timeA); // Reverse order (newest first)
+        });
+    }
+    
+    emailsToDisplay.forEach(mail => {
             const emailDiv = document.createElement('div');
             emailDiv.className = 'email-item';
             emailDiv.setAttribute('data-id', mail.id);
-            emailDiv.setAttribute('data-category', category);
+            emailDiv.setAttribute('data-category', mail.category || category);
+            emailDiv.setAttribute('data-timestamp', mail.timestamp || '');
             
-            let senderText = '';
-            if (category === 'Sent') {
-                senderText = `To: ${mail.receiver}`;
+            // Create avatar HTML
+            let avatarHTML = '';
+            if (category === 'Sent' && mail.receiver_avatar) {
+                avatarHTML = `<img src="${mail.receiver_avatar}" alt="Avatar" class="avatar-img">`;
             } else if (category === 'Drafts') {
-                senderText = `Draft to: ${mail.receiver || 'No recipient'}`;
+                avatarHTML = `<div class="avatar-initials draft-avatar" style="background-color: #FF9800;">
+                    <i class="fa-solid fa-file-lines"></i>
+                </div>`;
+            } else if (mail.sender_avatar) {
+                avatarHTML = `<img src="${mail.sender_avatar}" alt="Avatar" class="avatar-img">`;
             } else {
-                senderText = mail.sender;
+                const avatarColor = category === 'Sent' ? (mail.receiver_avatar_color || '#666666') : (mail.sender_avatar_color || '#666666');
+                const initials = category === 'Sent' ? (mail.receiver_initials || 'U') : (mail.sender_initials || 'U');
+                avatarHTML = `<div class="avatar-initials" style="background-color: ${avatarColor};">${initials}</div>`;
             }
             
-            const subjectText = mail.subject || (category === 'Drafts' ? '(No subject)' : '');
+            // Create sender text
+            let senderText = '';
+            if (category === 'Sent') {
+                senderText = `To: ${mail.receiver_name || mail.receiver || 'Unknown'}`;
+            } else if (category === 'Drafts') {
+                senderText = `Draft to: ${mail.receiver_name || mail.receiver || 'No recipient'}`;
+            } else {
+                senderText = mail.sender_name || mail.sender || 'Unknown';
+            }
             
+            // Create subject and preview
+            const subjectText = mail.subject || (category === 'Drafts' ? '(No subject)' : '(No subject)');
+            const previewText = mail.message_preview || mail.message || '';
+            const timeText = mail.formatted_time || 'Unknown';
+            
+            // Create full email item HTML structure
             emailDiv.innerHTML = `
-                <strong>${senderText}</strong>
-                <span>${subjectText}</span>
+                <div class="email-avatar">
+                    ${avatarHTML}
+                </div>
+                <div class="email-content">
+                    <div class="email-header">
+                        <strong class="email-sender">${senderText}</strong>
+                        <span class="email-time">${timeText}</span>
+                    </div>
+                    <div class="email-subject">${subjectText}</div>
+                    <div class="email-preview">${previewText}</div>
+                </div>
             `;
             
             // Add event listeners
@@ -1676,20 +1626,19 @@ function updateEmailList(categorizedMails) {
             
             mailListElement.appendChild(emailDiv);
         });
-    });
     
-    // Update visibility based on current filter
-    const activeFilter = document.querySelector('.menu-item.active');
-    if (activeFilter) {
-        const category = activeFilter.textContent.trim();
-        if (category !== 'All Mail') {
-            filterCategory(category);
+        // Update visibility based on current filter
+        const activeFilter = document.querySelector('.menu-item.active');
+        if (activeFilter) {
+            const category = activeFilter.textContent.trim();
+            if (category !== 'All Mail') {
+                filterCategory(category);
+            }
         }
+        
+        // Clear any existing selections
+        clearSelections();
     }
-    
-    // Clear any existing selections
-    clearSelections();
-}
 
 // Show success message
 function showRefreshSuccess(totalMessages) {
@@ -2146,6 +2095,25 @@ async function enableNotifications() {
         console.log('Notification permission result:', notificationPermission);
         
         if (notificationPermission === 'granted') {
+            // Ensure service worker is ready
+            if (!serviceWorkerRegistration || !serviceWorkerRegistration.active) {
+                console.log('Waiting for service worker to be ready...');
+                await new Promise(resolve => {
+                    if (serviceWorkerRegistration.installing) {
+                        serviceWorkerRegistration.installing.addEventListener('statechange', function() {
+                            if (this.state === 'activated') {
+                                resolve();
+                            }
+                        });
+                    } else if (serviceWorkerRegistration.active) {
+                        resolve();
+                    } else {
+                        // Wait a bit for service worker to activate
+                        setTimeout(resolve, 1000);
+                    }
+                });
+            }
+            
             await subscribeToNotifications();
             showNotification('Notifications enabled! You\'ll now receive alerts for new emails.', 'success');
             startPeriodicEmailChecking();
@@ -2241,10 +2209,10 @@ function startPeriodicEmailChecking() {
             if (result.success && result.new_emails > 0) {
                 console.log(`Found ${result.new_emails} new emails`);
                 
-                // Show browser notification for new emails
-                if (notificationPermission === 'granted') {
-                    showBrowserNotification(result.emails);
-                }
+                            // Show device notification for new emails
+            if (notificationPermission === 'granted') {
+                showDeviceNotification(result.emails);
+            }
                 
                 // Optionally refresh the email list
                 // performRefresh();
@@ -2256,21 +2224,73 @@ function startPeriodicEmailChecking() {
     }, 30000); // Check every 30 seconds
 }
 
-// Show browser notification for new emails with mobile optimization
+// Show device notification for new emails using service worker
+async function showDeviceNotification(emails) {
+    if (!emails || emails.length === 0) return;
+    
+    const firstEmail = emails[0];
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Check if service worker is ready
+    if (!serviceWorkerRegistration || !serviceWorkerRegistration.active) {
+        console.log('Service worker not ready, falling back to in-app notification');
+        showInAppNotification(`📧 ${emails.length} new email(s)`, `From: ${firstEmail.sender}`);
+        return;
+    }
+    
+    try {
+        // Send message to service worker to show notification
+        await serviceWorkerRegistration.active.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            data: {
+                title: emails.length === 1 
+                    ? `📧 ${firstEmail.sender_name || firstEmail.sender}` 
+                    : `📧 ${emails.length} new emails`,
+                body: emails.length === 1 
+                    ? (firstEmail.subject || '(No subject)')
+                    : `From: ${firstEmail.sender_name || firstEmail.sender}${emails.length > 1 ? ` +${emails.length - 1} more` : ''}`,
+                icon: isMobileDevice ? '/static/logo-192.png' : '/static/logo.png',
+                badge: '/static/logo.png',
+                tag: 'bharatmail-new-email',
+                requireInteraction: isMobileDevice,
+                silent: false,
+                vibrate: isMobileDevice ? [200, 100, 200] : undefined,
+                data: {
+                    emailId: firstEmail.id,
+                    totalEmails: emails.length,
+                    url: `/read/${firstEmail.id}`,
+                    timestamp: Date.now()
+                }
+            }
+        });
+        
+        console.log(`Device notification sent to service worker for ${emails.length} email(s)`);
+        
+    } catch (error) {
+        console.error('Failed to send notification to service worker:', error);
+        
+        // Fallback to in-app notification
+        showInAppNotification(
+            `📧 ${emails.length} new email(s)`, 
+            `From: ${firstEmail.sender_name || firstEmail.sender}`
+        );
+    }
+}
+
+// Fallback function for when service worker is not available
 function showBrowserNotification(emails) {
     if (emails && emails.length > 0) {
         const firstEmail = emails[0];
         const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         
         // Enhanced mobile-friendly notification content
         const title = emails.length === 1 
-            ? `📧 ${firstEmail.sender}` 
+            ? `📧 ${firstEmail.sender_name || firstEmail.sender}` 
             : `📧 ${emails.length} new emails`;
         
         const body = emails.length === 1 
-            ? firstEmail.subject || '(No subject)'
-            : `From: ${firstEmail.sender}${emails.length > 1 ? ` +${emails.length - 1} more` : ''}`;
+            ? (firstEmail.subject || '(No subject)')
+            : `From: ${firstEmail.sender_name || firstEmail.sender}${emails.length > 1 ? ` +${emails.length - 1} more` : ''}`;
         
         // Mobile-specific notification options
         const notificationOptions = {
@@ -2278,7 +2298,7 @@ function showBrowserNotification(emails) {
             icon: isMobileDevice ? '/static/logo-192.png' : '/static/logo.png',
             badge: '/static/logo.png',
             tag: 'bharatmail-new-email',
-            requireInteraction: isMobileDevice, // More persistent on mobile
+            requireInteraction: isMobileDevice,
             silent: false,
             vibrate: isMobileDevice ? [200, 100, 200] : undefined,
             timestamp: Date.now(),
@@ -2288,22 +2308,6 @@ function showBrowserNotification(emails) {
                 url: `/read/${firstEmail.id}`
             }
         };
-        
-        // Add action buttons (not supported on iOS)
-        if (!isIOS && 'actions' in Notification.prototype) {
-            notificationOptions.actions = [
-                {
-                    action: 'open',
-                    title: isMobileDevice ? '👀 View' : 'Open Email',
-                    icon: '/static/logo.png'
-                },
-                {
-                    action: 'dismiss',
-                    title: isMobileDevice ? '❌' : 'Dismiss',
-                    icon: '/static/logo.png'
-                }
-            ];
-        }
         
         // Enhanced notification creation with error handling
         try {
@@ -2336,33 +2340,19 @@ function showBrowserNotification(emails) {
                 notification.close();
             };
             
-            // Handle notification errors
-            notification.onerror = function(event) {
-                console.error('Notification error:', event);
-            };
-            
             // Enhanced auto-close timing based on device
-            const autoCloseTime = isMobileDevice ? 15000 : 10000; // Longer on mobile
+            const autoCloseTime = isMobileDevice ? 15000 : 10000;
             setTimeout(() => {
                 if (notification) {
                     notification.close();
                 }
             }, autoCloseTime);
             
-            // Log for debugging
-            console.log(`Mobile notification shown: ${title}`, {
-                isMobile: isMobileDevice,
-                isIOS: isIOS,
-                emailCount: emails.length
-            });
+            console.log(`Browser notification shown: ${title}`);
             
         } catch (error) {
-            console.error('Failed to create notification:', error);
-            
-            // Fallback: show in-app notification for mobile browsers with issues
-            if (isMobileDevice) {
-                showInAppNotification(title, body);
-            }
+            console.error('Failed to create browser notification:', error);
+            showInAppNotification(title, body);
         }
     }
 }
@@ -2559,6 +2549,20 @@ function showMobileNotificationSettings() {
                 ">
                     <i class="fa-solid fa-times"></i> Disable Notifications
                 </button>
+                <button id="test-notifications-btn" onclick="testDeviceNotification()" style="
+                    background: #2196F3;
+                    color: white;
+                    border: none;
+                    padding: ${isMobileDevice ? '12px 20px' : '10px 16px'};
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: ${isMobileDevice ? '16px' : '14px'};
+                    font-weight: bold;
+                    margin-left: 10px;
+                    touch-action: manipulation;
+                ">
+                    <i class="fa-solid fa-bell"></i> Test Notification
+                </button>
             </div>
         </div>
         
@@ -2679,6 +2683,38 @@ async function enableNotificationsFromSettings() {
 async function disableNotificationsFromSettings() {
     await disableNotifications();
     setTimeout(updateNotificationStatusDisplay, 1000);
+}
+
+// Test device notification function
+async function testDeviceNotification() {
+    try {
+        if (!serviceWorkerRegistration || !serviceWorkerRegistration.active) {
+            showNotification('Service worker not ready. Please refresh the page and try again.', 'error');
+            return;
+        }
+        
+        if (Notification.permission !== 'granted') {
+            showNotification('Notifications not enabled. Please enable them first.', 'error');
+            return;
+        }
+        
+        // Test notification data
+        const testEmail = {
+            id: 'test',
+            sender: 'test@bharatmail.in',
+            sender_name: 'Test User',
+            subject: 'Test Notification',
+            message: 'This is a test notification to verify device notifications are working.'
+        };
+        
+        // Show test notification
+        await showDeviceNotification([testEmail]);
+        showNotification('Test notification sent! Check your device notifications.', 'success');
+        
+    } catch (error) {
+        console.error('Error testing notification:', error);
+        showNotification('Failed to send test notification. Please try again.', 'error');
+    }
 }
 
 // Initialize notifications when page loads

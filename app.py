@@ -244,7 +244,7 @@ def parse_timestamp_for_sorting(timestamp_str):
         print(f"Error parsing timestamp for sorting {timestamp_str}: {e}")
         return datetime.min
 
-def enhance_email_data(mail, current_email):
+def enhance_email_data(mail, current_email, category=None):
     """Enhance email data with avatar, name, and formatted time"""
     try:
         # Add formatted time
@@ -253,6 +253,10 @@ def enhance_email_data(mail, current_email):
         # Add message preview
         message = mail.get('message', '')
         mail['message_preview'] = message[:100] + '...' if len(message) > 100 else message
+        
+        # Add category if provided
+        if category:
+            mail['category'] = category
         
         # Always get sender data
         sender_email = mail.get('sender')
@@ -480,10 +484,13 @@ def inbox():
         "Updates": []
     }
     
-    # Enhance all messages first
+    # Categorize and enhance messages
     enhanced_messages = []
     for mail in messages:
-        enhanced_mail = enhance_email_data(mail, current_email)
+        # Categorize first
+        category = categorize_mail(mail.get("subject", ""), mail.get("message", ""))
+        # Then enhance with category
+        enhanced_mail = enhance_email_data(mail, current_email, category)
         enhanced_messages.append(enhanced_mail)
     
     # Debug: Print first few timestamps to see the format
@@ -522,10 +529,13 @@ def inbox():
             or search_query in m.get("message", "").lower()
         ]
     
-    # Categorize the sorted messages
+    # Add categorized messages to their respective categories
     for enhanced_mail in enhanced_messages:
-        category = categorize_mail(enhanced_mail.get("subject", ""), enhanced_mail.get("message", ""))
+        category = enhanced_mail.get('category', 'Inbox')
         categorized_mails[category].append(enhanced_mail)
+    
+    # Create a unified sorted list for All Mail view
+    all_emails_sorted = enhanced_messages.copy()
 
     # Fetch Sent mails
     sent_messages_ref = firebase.ref.child("sent").child(user_key).get() or {}
@@ -537,7 +547,7 @@ def inbox():
     # Enhance sent messages first
     enhanced_sent_messages = []
     for mail in sent_messages:
-        enhanced_mail = enhance_email_data(mail, current_email)
+        enhanced_mail = enhance_email_data(mail, current_email, 'Sent')
         enhanced_sent_messages.append(enhanced_mail)
     
     # Sort enhanced sent messages by timestamp (newest first)
@@ -550,6 +560,9 @@ def inbox():
         print(f"Sorted {len(enhanced_sent_messages)} sent messages by string timestamp")
     
     categorized_mails["Sent"] = enhanced_sent_messages
+    
+    # Add sent messages to unified list
+    all_emails_sorted.extend(enhanced_sent_messages)
 
     # Fetch Draft mails
     draft_messages_ref = firebase.ref.child("drafts").child(user_key).get() or {}
@@ -561,7 +574,7 @@ def inbox():
     # Enhance draft messages first
     enhanced_draft_messages = []
     for mail in draft_messages:
-        enhanced_mail = enhance_email_data(mail, current_email)
+        enhanced_mail = enhance_email_data(mail, current_email, 'Drafts')
         enhanced_draft_messages.append(enhanced_mail)
     
     # Sort enhanced draft messages by timestamp (newest first)
@@ -574,6 +587,17 @@ def inbox():
         print(f"Sorted {len(enhanced_draft_messages)} draft messages by string timestamp")
     
     categorized_mails["Drafts"] = enhanced_draft_messages
+    
+    # Add draft messages to unified list
+    all_emails_sorted.extend(enhanced_draft_messages)
+    
+    # Sort the unified list by timestamp (newest first)
+    try:
+        all_emails_sorted.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        print(f"Final unified sort: {len(all_emails_sorted)} emails sorted by timestamp")
+    except Exception as e:
+        print(f"Error in final unified sort: {e}")
+        all_emails_sorted.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
     accounts = session.get('accounts', [])
     
@@ -628,7 +652,8 @@ def inbox():
         accounts=accounts,
         search_query=search_query,
         other_accounts=other_accounts,
-        categorized_mails=categorized_mails
+        categorized_mails=categorized_mails,
+        all_emails_sorted=all_emails_sorted
     )
 
 # Switch account
@@ -1320,10 +1345,13 @@ def refresh_emails():
             "Updates": []
         }
         
-        # Enhance all messages first
+        # Categorize and enhance messages
         enhanced_messages = []
         for mail in messages:
-            enhanced_mail = enhance_email_data(mail, current_email)
+            # Categorize first
+            category = categorize_mail(mail.get("subject", ""), mail.get("message", ""))
+            # Then enhance with category
+            enhanced_mail = enhance_email_data(mail, current_email, category)
             enhanced_messages.append(enhanced_mail)
         
         # Sort enhanced messages by timestamp (newest first)
@@ -1334,9 +1362,9 @@ def refresh_emails():
             # Fallback sorting if timestamp format is different
             enhanced_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
         
-        # Categorize the sorted messages
+        # Add categorized messages to their respective categories
         for enhanced_mail in enhanced_messages:
-            category = categorize_mail(enhanced_mail.get("subject", ""), enhanced_mail.get("message", ""))
+            category = enhanced_mail.get('category', 'Inbox')
             categorized_mails[category].append(enhanced_mail)
         
         # Fetch Sent mails
@@ -1359,7 +1387,7 @@ def refresh_emails():
         # Enhance sent messages first
         enhanced_sent_messages = []
         for mail in sent_messages:
-            enhanced_mail = enhance_email_data(mail, current_email)
+            enhanced_mail = enhance_email_data(mail, current_email, 'Sent')
             enhanced_sent_messages.append(enhanced_mail)
         
         # Sort enhanced sent messages by timestamp (newest first)
@@ -1370,6 +1398,10 @@ def refresh_emails():
             enhanced_sent_messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
         
         categorized_mails["Sent"] = enhanced_sent_messages
+        
+        # Create unified list for All Mail view
+        all_emails_sorted = enhanced_messages.copy()
+        all_emails_sorted.extend(enhanced_sent_messages)
         
         # Fetch Draft mails
         draft_messages_ref = firebase.ref.child("drafts").child(user_key).get() or {}
@@ -1391,7 +1423,7 @@ def refresh_emails():
         # Enhance draft messages first
         enhanced_draft_messages = []
         for mail in draft_messages:
-            enhanced_mail = enhance_email_data(mail, current_email)
+            enhanced_mail = enhance_email_data(mail, current_email, 'Drafts')
             enhanced_draft_messages.append(enhanced_mail)
         
         # Sort enhanced draft messages by timestamp (newest first)
@@ -1403,9 +1435,18 @@ def refresh_emails():
         
         categorized_mails["Drafts"] = enhanced_draft_messages
         
+        # Add draft messages to unified list and sort all together
+        all_emails_sorted.extend(enhanced_draft_messages)
+        try:
+            all_emails_sorted.sort(key=lambda x: parse_timestamp_for_sorting(x.get('timestamp')), reverse=True)
+        except Exception as e:
+            print(f"Error in final unified sort for refresh: {e}")
+            all_emails_sorted.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
         return jsonify({
             'success': True,
             'categorized_mails': categorized_mails,
+            'all_emails_sorted': all_emails_sorted,
             'timestamp': str(datetime.now()),
             'total_messages': len(messages)
         })

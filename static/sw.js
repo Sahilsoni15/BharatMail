@@ -192,4 +192,69 @@ self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+  
+  // Handle notification requests from main thread
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    console.log('Received notification request from main thread:', event.data.data);
+    
+    const notificationData = event.data.data;
+    
+    // Mobile-optimized vibration patterns
+    const vibrationPattern = isMobile() ? [200, 100, 200, 100, 200] : [100, 50, 100];
+    
+    // Choose appropriate icon size for mobile
+    const iconUrl = isMobile() ? '/static/logo-192.png' : '/static/logo.png';
+    
+    const notificationOptions = {
+      body: notificationData.body,
+      icon: notificationData.icon || iconUrl,
+      badge: notificationData.badge || '/static/logo.png',
+      vibrate: notificationData.vibrate || vibrationPattern,
+      silent: notificationData.silent !== undefined ? notificationData.silent : false,
+      timestamp: notificationData.timestamp || Date.now(),
+      data: notificationData.data || {
+        url: '/inbox',
+        mailId: null,
+        timestamp: Date.now()
+      },
+      actions: isMobile() ? [
+        {
+          action: 'open',
+          title: '📖 Open',
+          icon: '/static/logo.png'
+        },
+        {
+          action: 'dismiss',
+          title: '✖️ Dismiss',
+          icon: '/static/logo.png'
+        }
+      ] : [
+        {
+          action: 'open',
+          title: 'Open Email',
+          icon: '/static/logo.png'
+        },
+        {
+          action: 'dismiss',
+          title: 'Dismiss',
+          icon: '/static/logo.png'
+        }
+      ],
+      requireInteraction: notificationData.requireInteraction !== undefined ? notificationData.requireInteraction : isMobile(),
+      tag: notificationData.tag || 'bharatmail-notification',
+      renotify: true,
+      sticky: isMobile()
+    };
+
+    // Add mobile-specific options
+    if (isMobile()) {
+      notificationOptions.dir = 'auto';
+      notificationOptions.lang = 'en';
+    }
+
+    // Show the notification
+    event.waitUntil(
+      self.registration.showNotification(notificationData.title, notificationOptions)
+    );
+  }
 });
